@@ -1,26 +1,52 @@
-import logging
+from dataclasses import dataclass
+from enum import Enum
 
-from keboola.component.exceptions import UserException
-from pydantic import BaseModel, Field, ValidationError, field_validator
+from pydantic import BaseModel, Field
+
+
+@dataclass
+class Dataset:
+    title: str
+    api_function: str = ""
+    description: str = ""
+    filename: str = ""
+
+    def __eq__(self, other: object) -> bool:
+        if not isinstance(other, Dataset) and not isinstance(other, str):
+            return NotImplemented
+        if isinstance(other, str):
+            return self.title == other
+        if isinstance(other, Dataset):
+            return self.title == other.title
+        return False
+
+
+class DatasetsEnum(Enum):
+    # special case, doesn't have to have the arguments filled in as it will be used just to enable all other datasets
+    ALL = Dataset("ALL")
+    CAMPAIGNS = Dataset("CAMPAIGNS", "mailkit.campaigns.list", "list of campaigns", "campaigns.csv")
+    REPORT = Dataset("REPORT", "mailkit.report", "summary report", "summaryreport.csv")
+    REPORT_CAMPAIGN = Dataset("REPORT_CAMPAIGN", "mailkit.report.campaign", "campaign reports", "campaignreports.csv")
+    REPORT_MSG = Dataset("REPORT_MSG")
+    MSG_RECIPIENTS = Dataset("MSG_RECIPIENTS")
+    MSG_FEEDBACK = Dataset("MSG_FEEDBACK")
+    MSG_LINKS = Dataset("MSG_LINKS")
+    LINKS_VISITORS = Dataset("LINKS_VISITORS")
+    MSG_BOUNCES = Dataset("MSG_BOUNCES")
+    RAW_BOUNCES = Dataset("RAW_BOUNCES")
+    RAW_RESPONSES = Dataset("RAW_RESPONSES")
+    RAW_MESSAGES = Dataset("RAW_MESSAGES")
 
 
 class Configuration(BaseModel):
-    print_hello: bool
-    api_token: str = Field(alias="#api_token")
-    debug: bool = False
+    client_id: str = Field(alias="clientId")
+    client_md5: str = Field(alias="#clientMd5")
 
-    def __init__(self, **data):
-        try:
-            super().__init__(**data)
-        except ValidationError as e:
-            error_messages = [f"{err['loc'][0]}: {err['msg']}" for err in e.errors()]
-            raise UserException(f"Validation Error: {', '.join(error_messages)}")
+    datasets: list[DatasetsEnum] = Field(default_factory=list)
 
-        if self.debug:
-            logging.debug("Component will run in Debug mode")
+    since_last_run: bool = Field(alias="sinceLastRun", default=False)
+    days_period: int | None = Field(alias="daysPeriod", default=0)
+    date_from: str | None = Field(alias="dateFrom", default="")
+    date_to: str | None = Field(alias="dateTo", default="")
 
-    @field_validator("api_token")
-    def token_must_be_uppercase(cls, v):
-        if not v.isupper():
-            raise UserException("API token must be uppercase")
-        return v
+    campaign_ids: list[str] = Field(alias="campaignIds", default_factory=list)

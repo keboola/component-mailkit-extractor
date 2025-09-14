@@ -1,19 +1,112 @@
 {
   "type": "object",
-  "title": "extractor configuration",
+  "title": "Mailkit extractor KBC configuration",
   "required": [
-    "print_hello"
+    "clientId",
+    "#clientMd5",
+    "datasets",
+    "sinceLastRun",
+    "dateFrom",
+    "dateTo",
+    "daysPeriod",
+    "campaignIds"
   ],
   "properties": {
-    "print_hello": {
-      "type": "boolean",
-      "title": "Print Hello",
-      "propertyOrder": 1
+    "clientId": {
+      "type": "string",
+      "title": "Client ID",
+      "description": "Mailkit client ID",
+      "propertyOrder": 10
     },
-    "debug": {
+    "#clientMd5": {
+      "type": "string",
+      "title": "Client MD5",
+      "description": "Mailkit client MD5 hash",
+      "propertyOrder": 20
+    },
+    "verificationButton": {
+      "type": "button",
+      "format": "sync-action",
+      "propertyOrder": 30,
+      "options": {
+        "async": {
+          "label": "Verify Credentials",
+          "action": "verifyCredentials"
+        }
+      }
+    },
+    "datasets": {
+      "type": "array",
+      "title": "Datasets",
+      "description": "List of datasets to download.",
+      "propertyOrder": 40,
+      "format": "checkbox",
+      "minItems": 0,
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "enum": [
+          "ALL",
+          "CAMPAIGNS",
+          "REPORT",
+          "REPORT_CAMPAIGN",
+          "REPORT_MSG",
+          "MSG_RECIPIENTS",
+          "MSG_FEEDBACK",
+          "MSG_LINKS",
+          "LINKS_VISITORS",
+          "MSG_BOUNCES",
+          "RAW_BOUNCES",
+          "RAW_RESPONSES",
+          "RAW_MESSAGES"
+        ]
+      },
+      "default": [
+        "CAMPAIGNS",
+        "RAW_BOUNCES",
+        "RAW_RESPONSES",
+        "RAW_MESSAGES"
+      ]
+    },
+    "sinceLastRun": {
       "type": "boolean",
-      "title": "Debug",
-      "propertyOrder": 2
+      "description": "Overrides the period parameters and returns data in period since the last run of component.",
+      "propertyOrder": 50,
+      "default": false
+    },
+    "daysPeriod": {
+      "title": "Days Period",
+      "type": [
+        "integer",
+        "null"
+      ],
+      "description": "Sets the range period as number of days from now.",
+      "propertyOrder": 60,
+      "default": null
+    },
+    "dateFrom": {
+      "title": "Date From",
+      "type": "string",
+      "description": "Sets range period of returned data. Start date in format YYYY-MM-DD",
+      "propertyOrder": 70,
+      "default": null
+    },
+    "dateTo": {
+      "title": "Date To",
+      "type": "string",
+      "description": "Sets range period of returned data. End date in format YYYY-MM-DD",
+      "propertyOrder": 80,
+      "default": null
+    },
+    "campaignIds": {
+      "title": "Campaign IDs",
+      "description": "Campaign ids to download.",
+      "propertyOrder": 90,
+      "type": "array",
+      "items": {
+        "title": "Campaign",
+        "type": "string"
+      }
     }
   }
 }
