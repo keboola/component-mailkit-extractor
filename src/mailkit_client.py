@@ -33,25 +33,37 @@ class MailkitClient:
 
             result = resp.json()
             if result:
-                logging.info("Getting %s: OK", ds.description)
+                logging.info("Getting %s: OK (%i items)", ds.description, len(result))
             return result
         except Exception as e:
             logging.exception("Failed to get %s: %s", ds.description, e)
 
         return None
 
-    def summary_report(self, ds: Dataset, date_from: str, date_to: str) -> list | None:
+    def campaing_list(self, ds: Dataset, campaign_id: str) -> list | None:
+        payload = {}
+        if campaign_id:
+            payload["ID_message"] = campaign_id
+        return self._call_api(ds, payload)
+
+    def report(self, ds: Dataset, date_from: str, date_to: str) -> list | None:
         payload = {
             "parameters": {},
         }
         # TODO: date validation
         if date_from:
-            payload["parameters"]["date_from"] = date_from
+            payload["parameters"]["range_from"] = date_from
         if date_to:
-            payload["parameters"]["date_to"] = date_to
+            payload["parameters"]["range_to"] = date_to
         return self._call_api(ds, payload)
 
-    def campaign_reports(self, ds: Dataset, campaign_id: str, date_from: str, date_to: str) -> list | None:
+    def campaign_reports(
+        self,
+        ds: Dataset,
+        campaign_id: str,
+        date_from: str,
+        date_to: str,
+    ) -> list | None:
         payload = {
             "parameters": {
                 "ID_message": campaign_id,
@@ -59,13 +71,18 @@ class MailkitClient:
         }
         # TODO: date validation
         if date_from:
-            payload["parameters"]["date_from"] = date_from
+            payload["parameters"]["range_from"] = date_from
         if date_to:
-            payload["parameters"]["date_to"] = date_to
+            payload["parameters"]["range_to"] = date_to
         return self._call_api(ds, payload)
 
-    def campaing_list(self, ds: Dataset, campaign_id: str) -> list | None:
-        payload = {}
-        if campaign_id:
-            payload["ID_message"] = campaign_id
+    def message_links(self, ds: Dataset, id_send: str) -> list | None:
+        payload = {
+            "parameters": {
+                "ID_send": id_send,
+            },
+        }
         return self._call_api(ds, payload)
+
+    def raw_messages_bounces_responses(self, ds: Dataset) -> list | None:
+        return self._call_api(ds, {})
