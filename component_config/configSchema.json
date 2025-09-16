@@ -37,7 +37,6 @@
     "datasets": {
       "type": "array",
       "title": "Datasets",
-      "description": "List of datasets to download.",
       "propertyOrder": 40,
       "format": "checkbox",
       "minItems": 0,
@@ -45,57 +44,91 @@
       "items": {
         "type": "string",
         "enum": [
-          "ALL",
           "CAMPAIGNS",
           "REPORT",
           "REPORT_CAMPAIGN",
-          "REPORT_MSG",
-          "MSG_RECIPIENTS",
-          "MSG_FEEDBACK",
           "MSG_LINKS",
-          "LINKS_VISITORS",
-          "MSG_BOUNCES",
+          "RAW_MESSAGES",
           "RAW_BOUNCES",
-          "RAW_RESPONSES",
-          "RAW_MESSAGES"
+          "RAW_RESPONSES"
         ]
       },
-      "default": [
-        "CAMPAIGNS",
-        "RAW_BOUNCES",
-        "RAW_RESPONSES",
-        "RAW_MESSAGES"
-      ]
+      "default": []
     },
-    "dateFrom": {
-      "title": "Date From",
+    "dateRange": {
+      "enum": [
+        "relative",
+        "absolute",
+        ""
+      ],
       "type": "string",
-      "description": "Sets range period of returned data. Start date in format YYYY-MM-DD",
-      "propertyOrder": 50,
-      "default": null
-    },
-    "dateTo": {
-      "title": "Date To",
-      "type": "string",
-      "description": "Sets range period of returned data. End date in format YYYY-MM-DD",
-      "propertyOrder": 60,
-      "default": null
+      "format": "radio",
+      "title": "Date Range",
+      "default": "",
+      "options": {
+        "enum_titles": [
+          "Relative",
+          "Absolute",
+          "Not set (old configuration)"
+        ]
+      },
+      "propertyOrder": 50
     },
     "daysPeriod": {
-      "title": "Days Period",
+      "title": "Relative – Days Before Today",
       "type": "integer",
-      "description": "Sets the range period as number of days from now (only valid if the above fields are left empty).",
+      "description": "Sets the range period as number of days from now. When set to 0, all data is fetched",
+      "propertyOrder": 60,
+      "default": 7,
+      "options": {
+        "dependencies": {
+          "dateRange": [
+            "relative",
+            ""
+          ]
+        }
+      }
+    },
+    "dateFrom": {
+      "title": "Absolute – Date From",
+      "type": "string",
+      "description": "Sets range period of returned data. Start date in format YYYY-MM-DD",
       "propertyOrder": 70,
-      "default": null
+      "default": null,
+      "options": {
+        "dependencies": {
+          "dateRange": [
+            "absolute",
+            ""
+          ]
+        }
+      }
+    },
+    "dateTo": {
+      "title": "Absolute – Date To",
+      "type": "string",
+      "description": "Sets range period of returned data. End date in format YYYY-MM-DD",
+      "propertyOrder": 80,
+      "default": null,
+      "options": {
+        "dependencies": {
+          "dateRange": [
+            "absolute",
+            ""
+          ]
+        }
+      }
     },
     "campaignIds": {
       "title": "Campaign IDs",
-      "description": "Campaign ids to download.",
-      "propertyOrder": 80,
+      "propertyOrder": 90,
       "type": "array",
       "items": {
         "title": "Campaign",
         "type": "string"
+      },
+      "options": {
+        "tooltip": "If specified, only these campaigns will be downloaded"
       }
     }
   }

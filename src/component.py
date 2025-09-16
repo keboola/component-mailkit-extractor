@@ -29,26 +29,21 @@ class Component(ComponentBase):
         if not date_from and not date_to:
             logging.info("No date range specified, fetching all data.")
 
-        if get_all := DatasetsEnum.ALL in self.params.datasets:
-            logging.info("Processing all datasets")
-        else:
-            # ensure all dependencies are included
-            added_datasets = []
-            for dataset in self.params.datasets:
-                for dep in dataset.value.depends_on:
-                    if dep not in self.params.datasets:
-                        added_datasets.append(dep)
-                        logging.warning(
-                            "Adding dataset %s as a dependency of the selected %s dataset.",
-                            dep,
-                            dataset.value.title,
-                        )
-            self.params.datasets.extend(added_datasets)
+        # ensure all dependencies are included
+        added_datasets = []
+        for dataset in self.params.datasets:
+            for dep in dataset.value.depends_on:
+                if dep not in self.params.datasets:
+                    added_datasets.append(dep)
+                    logging.warning(
+                        "Adding dataset %s as a dependency of the selected %s dataset.",
+                        dep,
+                        dataset.value.title,
+                    )
+        self.params.datasets.extend(added_datasets)
 
         for dataset in DatasetsEnum:
-            if dataset == DatasetsEnum.ALL:
-                continue
-            if not get_all and dataset not in self.params.datasets:
+            if dataset not in self.params.datasets:
                 continue
 
             ds = dataset.value
@@ -67,7 +62,12 @@ class Component(ComponentBase):
                 case DatasetsEnum.RAW_MESSAGES | DatasetsEnum.RAW_BOUNCES | DatasetsEnum.RAW_RESPONSES:
                     data = self._get_raw_messages_bounces_responses(ds)
                 case _:
-                    logging.warning(f"The {ds.title} dataset ({ds.api_function}) is not implemented.")
+                    logging.warning(
+                        "The %s dataset (API method: %s) is not implemented. If you believe this is an error, "
+                        "please contact Keboola support. 🐙",
+                        ds.title,
+                        ds.api_function,
+                    )
 
             if data is not None:
                 self._write_results(ds.filename, data, ds.primary_key)
@@ -104,7 +104,7 @@ class Component(ComponentBase):
 
         campaign_ids = self.params.campaign_ids or [""]
         for campaign_id in campaign_ids:
-            if data := self.mkc.campaing_list(ds, campaign_id):
+            if data := self.mkc.campaigns_list(ds, campaign_id):
                 campaigns.extend(data)
 
         return campaigns
@@ -155,7 +155,7 @@ class Component(ComponentBase):
 
     @sync_action("verifyCredentials")
     def verify_credentials(self):
-        if self.mkc.campaing_list(DatasetsEnum.CAMPAIGNS.value, ""):
+        if self.mkc.campaigns_list(DatasetsEnum.CAMPAIGNS.value, ""):
             return sync_actions.ValidationResult("Verification successful", sync_actions.MessageType.SUCCESS)
         return sync_actions.ValidationResult("Failed to verify credentials", sync_actions.MessageType.ERROR)
 

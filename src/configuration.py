@@ -28,26 +28,22 @@ class Dataset:
         return False
 
 
+class DateRangeEnum(str, Enum):
+    RELATIVE = "relative"
+    ABSOLUTE = "absolute"
+    NOT_SET = ""
+
+
 class DatasetsEnum(Enum):
     """
     The order of the datasets here matters, as certain reports depend on previous ones.
     """
-
-    # special case, doesn't have to have the arguments filled in as it will be used just to enable all other datasets
-    # TODO: remove 🤔
-    ALL = Dataset("ALL")
 
     CAMPAIGNS = Dataset("CAMPAIGNS", "mailkit.campaigns.list", "list of campaigns", "campaigns.csv", "ID_MESSAGE")
     REPORT = Dataset("REPORT", "mailkit.report", "summary report", "summaryreport.csv", "ID_MESSAGE")
     REPORT_CAMPAIGN = Dataset(
         "REPORT_CAMPAIGN", "mailkit.report.campaign", "campaign reports", "campaignreports.csv", "ID_SEND"
     )
-
-    # not implemented
-    REPORT_MSG = Dataset("REPORT_MSG", "mailkit.report.message", depends_on=[str(REPORT_CAMPAIGN)])
-    MSG_RECIPIENTS = Dataset("MSG_RECIPIENTS", "mailkit.report.message.recipients", depends_on=[str(REPORT_CAMPAIGN)])
-    MSG_FEEDBACK = Dataset("MSG_FEEDBACK", "mailkit.report.message.feedback", depends_on=[str(REPORT_CAMPAIGN)])
-
     MSG_LINKS = Dataset(
         "MSG_LINKS",
         "mailkit.report.message.links",
@@ -56,13 +52,6 @@ class DatasetsEnum(Enum):
         "ID_URL",
         depends_on=[str(REPORT_CAMPAIGN)],
     )
-
-    # not implemented
-    LINKS_VISITORS = Dataset(
-        "LINKS_VISITORS", "mailkit.report.message.links.visitors", depends_on=[str(REPORT_CAMPAIGN)]
-    )  # one more dependency (ID_URL)
-    MSG_BOUNCES = Dataset("MSG_BOUNCES", "mailkit.report.message.bounces", depends_on=[str(REPORT_CAMPAIGN)])
-
     RAW_MESSAGES = Dataset(
         "RAW_MESSAGES", "mailkit.report.raw.messages", "raw messages", "raw_messages.csv", "ID_send_message"
     )
@@ -74,12 +63,25 @@ class DatasetsEnum(Enum):
         "RAW_RESPONSES", "mailkit.report.raw.responses", "raw responses", "raw_responses.csv", "ID_send_message"
     )
 
+    # The following enum values are not implemented in the current version as they were not used by the clients at all.
+    # We keep them here just for backwards compatibility of the configurations.
+    ALL = Dataset("ALL", "N/A")
+    REPORT_MSG = Dataset("REPORT_MSG", "mailkit.report.message", depends_on=[str(REPORT_CAMPAIGN)])
+    MSG_RECIPIENTS = Dataset("MSG_RECIPIENTS", "mailkit.report.message.recipients", depends_on=[str(REPORT_CAMPAIGN)])
+    MSG_FEEDBACK = Dataset("MSG_FEEDBACK", "mailkit.report.message.feedback", depends_on=[str(REPORT_CAMPAIGN)])
+    LINKS_VISITORS = Dataset(
+        "LINKS_VISITORS", "mailkit.report.message.links.visitors", depends_on=[str(REPORT_CAMPAIGN)]
+    )  # this dataset has one more dependency (ID_URL)
+    MSG_BOUNCES = Dataset("MSG_BOUNCES", "mailkit.report.message.bounces", depends_on=[str(REPORT_CAMPAIGN)])
+
 
 class Configuration(BaseModel):
     client_id: str = Field(alias="clientId")
     client_md5: str = Field(alias="#clientMd5")
 
     datasets: list[DatasetsEnum] = Field(default_factory=list)
+
+    date_range: DateRangeEnum | None = Field(alias="dateRange", default=None)
 
     days_period: int | None = Field(alias="daysPeriod", default=0)
     date_from: str | None = Field(alias="dateFrom", default="")
@@ -89,19 +91,24 @@ class Configuration(BaseModel):
 
     # obsolete, deprecated parameter, never implemented even in the previous versions
     # keeping it here just for configuration compatibility
-    since_last_run: bool = Field(alias="sinceLastRun")
+    since_last_run: bool = Field(alias="sinceLastRun", default=False)
 
     @computed_field
     @cached_property
     def date_range_to(self) -> str:
-        if self.days_period:
+        if self.date_range != DateRangeEnum.ABSOLUTE and self.days_period:
             return date.today().isoformat()
-        return self.date_to or ""
+        if self.date_range != DateRangeEnum.RELATIVE:
+            return self.date_to or ""
+        return ""
 
     @computed_field
     @cached_property
     def date_range_from(self) -> str:
-        if self.days_period:
+        # the conditions are written this way in order to support old condigurations with date_range not set at all
+        if self.date_range != DateRangeEnum.ABSOLUTE and self.days_period:
             date_from = date.today() - timedelta(days=self.days_period)
             return date_from.isoformat()
-        return self.date_from or ""
+        if self.date_range != DateRangeEnum.RELATIVE:
+            return self.date_from or ""
+        return ""
