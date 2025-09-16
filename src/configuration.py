@@ -1,7 +1,9 @@
 from dataclasses import dataclass, field
+from datetime import date, timedelta
 from enum import Enum
+from functools import cached_property
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, computed_field
 
 
 @dataclass
@@ -79,9 +81,27 @@ class Configuration(BaseModel):
 
     datasets: list[DatasetsEnum] = Field(default_factory=list)
 
-    since_last_run: bool = Field(alias="sinceLastRun", default=False)
     days_period: int | None = Field(alias="daysPeriod", default=0)
     date_from: str | None = Field(alias="dateFrom", default="")
     date_to: str | None = Field(alias="dateTo", default="")
 
     campaign_ids: list[str] = Field(alias="campaignIds", default_factory=list)
+
+    # obsolete, deprecated parameter, never implemented even in the previous versions
+    # keeping it here just for configuration compatibility
+    since_last_run: bool = Field(alias="sinceLastRun")
+
+    @computed_field
+    @cached_property
+    def date_range_to(self) -> str:
+        if self.days_period:
+            return date.today().isoformat()
+        return self.date_to or ""
+
+    @computed_field
+    @cached_property
+    def date_range_from(self) -> str:
+        if self.days_period:
+            date_from = date.today() - timedelta(days=self.days_period)
+            return date_from.isoformat()
+        return self.date_from or ""

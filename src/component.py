@@ -19,8 +19,15 @@ class Component(ComponentBase):
         self.send_ids: set[str] = set()
 
     def run(self):
-        date_from = self.params.date_from or ""
-        date_to = self.params.date_to or ""
+        date_from = self.params.date_range_from
+        date_to = self.params.date_range_to
+
+        if date_from:
+            logging.info("Date range start: %s", date_from)
+        if date_to:
+            logging.info("Date range end: %s", date_to)
+        if not date_from and not date_to:
+            logging.info("No date range specified, fetching all data.")
 
         if get_all := DatasetsEnum.ALL in self.params.datasets:
             logging.info("Processing all datasets")
