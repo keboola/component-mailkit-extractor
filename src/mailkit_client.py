@@ -92,3 +92,12 @@ class MailkitClient:
         # https://www.mailkit.com/cz/podpora/api/statistiky/mailkitreportrawbounces
         # https://www.mailkit.com/cz/podpora/api/statistiky/mailkitreportrawresponses
         return self._call_api(ds, {})
+
+    def mailinglist_unsubscribed(self, ds: Dataset, date_from: str) -> list | None:
+        # https://www.mailkit.com/cz/podpora/api/statistiky/mailkitmalinglistunsubscribed
+        payload = {}
+        if date_from:
+            payload["parameters"] = {
+                "range_from": date_from,
+            }
+        return self._call_api(ds, payload)

@@ -61,6 +61,8 @@ class Component(ComponentBase):
                     data = self._get_message_links(ds)
                 case DatasetsEnum.RAW_MESSAGES | DatasetsEnum.RAW_BOUNCES | DatasetsEnum.RAW_RESPONSES:
                     data = self._get_raw_messages_bounces_responses(ds)
+                case DatasetsEnum.MLIST_UNSUBSCRIBED:
+                    data = self._get_mailinglist_unsubscribed(ds, date_from)
                 case _:
                     logging.warning(
                         "The %s dataset (API method: %s) is not implemented. If you believe this is an error, "
@@ -150,6 +152,11 @@ class Component(ComponentBase):
 
     def _get_raw_messages_bounces_responses(self, ds: Dataset) -> list[dict]:
         if data := self.mkc.raw_messages_bounces_responses(ds):
+            return data
+        return []
+
+    def _get_mailinglist_unsubscribed(self, ds: Dataset, date_from: str) -> list[dict]:
+        if data := self.mkc.mailinglist_unsubscribed(ds, date_from):
             return data
         return []
 

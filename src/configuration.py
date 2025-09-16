@@ -62,6 +62,9 @@ class DatasetsEnum(Enum):
     RAW_RESPONSES = Dataset(
         "RAW_RESPONSES", "mailkit.report.raw.responses", "raw responses", "raw_responses.csv", "ID_send_message"
     )
+    MLIST_UNSUBSCRIBED = Dataset(
+        "MLIST_UNSUBSCRIBED", "mailkit.mailinglist.unsubscribed", "unsubscribed emails", "unsubscribed.csv", "EMAIL"
+    )
 
     # The following enum values are not implemented in the current version as they were not used by the clients at all.
     # We keep them here just for backwards compatibility of the configurations.

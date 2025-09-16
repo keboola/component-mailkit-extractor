@@ -50,7 +50,8 @@
           "MSG_LINKS",
           "RAW_MESSAGES",
           "RAW_BOUNCES",
-          "RAW_RESPONSES"
+          "RAW_RESPONSES",
+          "MLIST_UNSUBSCRIBED"
         ]
       },
       "default": []
