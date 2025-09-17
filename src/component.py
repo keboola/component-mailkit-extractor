@@ -1,95 +1,172 @@
-"""
-Template Component main class.
-
-"""
-
 import csv
 import logging
-from datetime import datetime
 
-from keboola.component.base import ComponentBase
+from keboola.component import sync_actions
+from keboola.component.base import ComponentBase, sync_action
 from keboola.component.exceptions import UserException
 
-from configuration import Configuration
+from configuration import Configuration, Dataset, DatasetsEnum
+from mailkit_client import MailkitClient
 
 
 class Component(ComponentBase):
-    """
-    Extends base class for general Python components. Initializes the CommonInterface
-    and performs configuration validation.
-
-    For easier debugging the data folder is picked up by default from `../data` path,
-    relative to working directory.
-
-    If `debug` parameter is present in the `config.json`, the default logger is set to verbose DEBUG mode.
-    """
-
     def __init__(self):
         super().__init__()
 
+        self.params = Configuration(**self.configuration.parameters)
+        self.mkc = MailkitClient(self.params.client_id, self.params.client_md5)
+        self.campaign_ids: list[str] = self.params.campaign_ids or []
+        self.send_ids: set[str] = set()
+
     def run(self):
-        """
-        Main execution code
-        """
+        date_from = self.params.date_range_from
+        date_to = self.params.date_range_to
 
-        # ####### EXAMPLE TO REMOVE
-        # check for missing configuration parameters
-        params = Configuration(**self.configuration.parameters)
+        if date_from:
+            logging.info("Date range start: %s", date_from)
+        if date_to:
+            logging.info("Date range end: %s", date_to)
+        if not date_from and not date_to:
+            logging.info("No date range specified, fetching all data.")
 
-        # Access parameters in configuration
-        if params.print_hello:
-            logging.info("Hello World")
+        # ensure all dependencies are included
+        added_datasets = []
+        for dataset in self.params.datasets:
+            for dep in dataset.value.depends_on:
+                if dep not in self.params.datasets:
+                    added_datasets.append(dep)
+                    logging.warning(
+                        "Adding dataset %s as a dependency of the selected %s dataset.",
+                        dep,
+                        dataset.value.title,
+                    )
+        self.params.datasets.extend(added_datasets)
 
-        # get input table definitions
-        input_tables = self.get_input_tables_definitions()
-        for table in input_tables:
-            logging.info(f"Received input table: {table.name} with path: {table.full_path}")
+        for dataset in DatasetsEnum:
+            if dataset not in self.params.datasets:
+                continue
 
-        if len(input_tables) == 0:
-            raise UserException("No input tables found")
+            ds = dataset.value
 
-        # get last state data/in/state.json from previous run
-        previous_state = self.get_state_file()
-        logging.info(previous_state.get("some_parameter"))
+            data = None
+            logging.info(f"Processing dataset: {ds.title}")
+            match dataset:
+                case DatasetsEnum.CAMPAIGNS:
+                    data = self._get_campaigns(ds)
+                case DatasetsEnum.REPORT:
+                    data = self._get_summary_report(ds, date_from, date_to)
+                case DatasetsEnum.REPORT_CAMPAIGN:
+                    data = self._get_campaign_reports(ds, date_from, date_to)
+                case DatasetsEnum.MSG_LINKS:
+                    data = self._get_message_links(ds)
+                case DatasetsEnum.RAW_MESSAGES | DatasetsEnum.RAW_BOUNCES | DatasetsEnum.RAW_RESPONSES:
+                    data = self._get_raw_messages_bounces_responses(ds)
+                case DatasetsEnum.MLIST_UNSUBSCRIBED:
+                    data = self._get_mailinglist_unsubscribed(ds, date_from)
+                case _:
+                    logging.warning(
+                        "The %s dataset (API method: %s) is not implemented. If you believe this is an error, "
+                        "please contact Keboola support. 🐙",
+                        ds.title,
+                        ds.api_function,
+                    )
 
-        # Create output table (Table definition - just metadata)
-        table = self.create_out_table_definition("output.csv", incremental=True, primary_key=["timestamp"])
+            self._write_results(ds, data)
 
-        # get file path of the table (data/out/tables/Features.csv)
-        out_table_path = table.full_path
-        logging.info(out_table_path)
+    def _get_fieldnames(self, data: list[dict], primary_key: str) -> list[str]:
+        fieldnames = set()
+        for row in data:
+            if primary_key not in row:
+                raise Exception(
+                    f"Primary key {primary_key} not found in data fields (keys: {', '.join(sorted(row.keys()))})."
+                )
+            fieldnames.update(row.keys())
+        fieldnames.remove(primary_key)
+        return [primary_key] + sorted(list(fieldnames))
 
-        # Add timestamp column and save into out_table_path
-        input_table = input_tables[0]
-        with (
-            open(input_table.full_path, "r") as inp_file,
-            open(table.full_path, mode="wt", encoding="utf-8", newline="") as out_file,
-        ):
-            reader = csv.DictReader(inp_file)
+    def _write_results(self, ds: Dataset, data: list[dict] | None) -> None:
+        if not data:
+            logging.warning("No data in the %s dataset", ds.title)
+            return
 
-            columns = list(reader.fieldnames)
-            # append timestamp
-            columns.append("timestamp")
+        logging.info("Writing %s items to %s", len(data), ds.filename)
+        table = self.create_out_table_definition(ds.filename, incremental=True, primary_key=[ds.primary_key])
 
-            # write result with column added
-            writer = csv.DictWriter(out_file, fieldnames=columns)
+        with open(table.full_path, mode="w", encoding="utf-8", newline="") as out_file:
+            fieldnames = self._get_fieldnames(data, ds.primary_key)
+            writer = csv.DictWriter(out_file, fieldnames=fieldnames)
             writer.writeheader()
-            for in_row in reader:
-                in_row["timestamp"] = datetime.now().isoformat()
-                writer.writerow(in_row)
+            for row in data:
+                writer.writerow(row)
 
-        # Save table manifest (output.csv.manifest) from the Table definition
         self.write_manifest(table)
 
-        # Write new state - will be available next run
-        self.write_state_file({"some_state_parameter": "value"})
+    def _get_campaigns(self, ds: Dataset) -> list[dict]:
+        campaigns = []
 
-        # ####### EXAMPLE TO REMOVE END
+        campaign_ids = self.params.campaign_ids or [""]
+        for campaign_id in campaign_ids:
+            if data := self.mkc.campaigns_list(ds, campaign_id):
+                campaigns.extend(data)
+
+        return campaigns
+
+    def _get_summary_report(self, ds: Dataset, date_from: str, date_to: str) -> list[dict]:
+        """Get summary report and – if not filled in by user – populate the list of campaign IDs
+        to be used for getting other datasets."""
+        data = self.mkc.report(ds, date_from, date_to)
+
+        if not data:
+            return []
+
+        if not self.campaign_ids:
+            self.campaign_ids = list({c["ID_MESSAGE"] for c in data})
+        logging.info("Parsing %s: %s unique campaigns", ds.description, len(self.campaign_ids))
+
+        return data
+
+    def _get_campaign_reports(self, ds: Dataset, date_from: str, date_to: str) -> list[dict]:
+        """Gets campaign reports for all campaign IDs in the configuration."""
+        campaigns = []
+
+        for campaign_id in self.campaign_ids:
+            if data := self.mkc.campaign_reports(ds, campaign_id, date_from, date_to):
+                campaigns.extend(data)
+
+        if not campaigns:
+            return []
+
+        self.send_ids |= {c["ID_SEND"] for c in campaigns}
+        logging.info("Parsing %s: %s unique sends", ds.description, len(self.send_ids))
+
+        return campaigns
+
+    def _get_message_links(self, ds: Dataset) -> list[dict]:
+        links = []
+
+        for send_id in self.send_ids:
+            if data := self.mkc.message_links(ds, send_id):
+                links.extend(data)
+
+        return links
+
+    def _get_raw_messages_bounces_responses(self, ds: Dataset) -> list[dict]:
+        if data := self.mkc.raw_messages_bounces_responses(ds):
+            return data
+        return []
+
+    def _get_mailinglist_unsubscribed(self, ds: Dataset, date_from: str) -> list[dict]:
+        if data := self.mkc.mailinglist_unsubscribed(ds, date_from):
+            return data
+        return []
+
+    @sync_action("verifyCredentials")
+    def verify_credentials(self):
+        if self.mkc.campaigns_list(DatasetsEnum.CAMPAIGNS.value, ""):
+            return sync_actions.ValidationResult("Verification successful", sync_actions.MessageType.SUCCESS)
+        return sync_actions.ValidationResult("Failed to verify credentials", sync_actions.MessageType.ERROR)
 
 
-"""
-        Main entrypoint
-"""
 if __name__ == "__main__":
     try:
         comp = Component()

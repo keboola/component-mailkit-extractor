@@ -1,19 +1,134 @@
 {
   "type": "object",
-  "title": "extractor configuration",
+  "title": "Configuration",
   "required": [
-    "print_hello"
+    "clientId",
+    "#clientMd5",
+    "datasets",
+    "dateFrom",
+    "dateTo",
+    "daysPeriod",
+    "campaignIds"
   ],
   "properties": {
-    "print_hello": {
-      "type": "boolean",
-      "title": "Print Hello",
-      "propertyOrder": 1
+    "clientId": {
+      "type": "string",
+      "title": "Client ID",
+      "description": "Mailkit client ID",
+      "propertyOrder": 10
     },
-    "debug": {
-      "type": "boolean",
-      "title": "Debug",
-      "propertyOrder": 2
+    "#clientMd5": {
+      "type": "string",
+      "title": "Client MD5",
+      "description": "Mailkit client MD5 hash",
+      "propertyOrder": 20
+    },
+    "verificationButton": {
+      "type": "button",
+      "format": "sync-action",
+      "propertyOrder": 30,
+      "options": {
+        "async": {
+          "label": "Verify Credentials",
+          "action": "verifyCredentials"
+        }
+      }
+    },
+    "datasets": {
+      "type": "array",
+      "title": "Datasets",
+      "propertyOrder": 40,
+      "format": "checkbox",
+      "minItems": 0,
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "enum": [
+          "CAMPAIGNS",
+          "REPORT",
+          "REPORT_CAMPAIGN",
+          "MSG_LINKS",
+          "RAW_MESSAGES",
+          "RAW_BOUNCES",
+          "RAW_RESPONSES",
+          "MLIST_UNSUBSCRIBED"
+        ]
+      },
+      "default": []
+    },
+    "dateRange": {
+      "enum": [
+        "relative",
+        "absolute"
+      ],
+      "type": "string",
+      "format": "radio",
+      "title": "Date Range",
+      "default": "relative",
+      "options": {
+        "enum_titles": [
+          "Relative",
+          "Absolute"
+        ]
+      },
+      "propertyOrder": 50
+    },
+    "daysPeriod": {
+      "title": "Relative – Days Before Today",
+      "type": "integer",
+      "description": "Sets the range period as number of days from now. When set to 0, all data is fetched",
+      "propertyOrder": 60,
+      "default": 7,
+      "options": {
+        "dependencies": {
+          "dateRange": [
+            "relative",
+            ""
+          ]
+        }
+      }
+    },
+    "dateFrom": {
+      "title": "Absolute – Date From",
+      "type": "string",
+      "description": "Sets range period of returned data. Start date in format YYYY-MM-DD",
+      "propertyOrder": 70,
+      "default": null,
+      "options": {
+        "dependencies": {
+          "dateRange": [
+            "absolute",
+            ""
+          ]
+        }
+      }
+    },
+    "dateTo": {
+      "title": "Absolute – Date To",
+      "type": "string",
+      "description": "Sets range period of returned data. End date in format YYYY-MM-DD",
+      "propertyOrder": 80,
+      "default": null,
+      "options": {
+        "dependencies": {
+          "dateRange": [
+            "absolute",
+            ""
+          ]
+        }
+      }
+    },
+    "campaignIds": {
+      "title": "Campaign IDs",
+      "propertyOrder": 90,
+      "type": "array",
+      "items": {
+        "title": "Campaign",
+        "type": "string"
+      },
+      "options": {
+        "tooltip": "If specified, only these campaigns will be downloaded"
+      }
     }
   }
 }

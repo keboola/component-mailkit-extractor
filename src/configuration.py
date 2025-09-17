@@ -1,26 +1,111 @@
-import logging
+from dataclasses import dataclass, field
+from datetime import date, timedelta
+from enum import Enum
+from functools import cached_property
 
-from keboola.component.exceptions import UserException
-from pydantic import BaseModel, Field, ValidationError, field_validator
+from pydantic import BaseModel, Field, computed_field
+
+
+@dataclass
+class Dataset:
+    title: str
+    api_function: str = ""
+    description: str = ""
+    filename: str = ""
+    primary_key: str = ""
+    depends_on: list[str] = field(default_factory=list)
+
+    def __str__(self) -> str:
+        return self.title
+
+    def __eq__(self, other: object) -> bool:
+        if not isinstance(other, Dataset) and not isinstance(other, str):
+            return NotImplemented
+        if isinstance(other, str):
+            return str(self) == other
+        if isinstance(other, Dataset):
+            return str(self) == str(other)
+        return False
+
+
+class DatasetsEnum(Enum):
+    """
+    The order of the datasets here matters, as certain reports depend on previous ones.
+    """
+
+    CAMPAIGNS = Dataset("CAMPAIGNS", "mailkit.campaigns.list", "list of campaigns", "campaigns.csv", "ID_MESSAGE")
+    REPORT = Dataset("REPORT", "mailkit.report", "summary report", "summaryreport.csv", "ID_MESSAGE")
+    REPORT_CAMPAIGN = Dataset(
+        "REPORT_CAMPAIGN", "mailkit.report.campaign", "campaign reports", "campaignreports.csv", "ID_SEND"
+    )
+    MSG_LINKS = Dataset(
+        "MSG_LINKS",
+        "mailkit.report.message.links",
+        "message links",
+        "links.csv",
+        "ID_URL",
+        depends_on=[str(REPORT_CAMPAIGN)],
+    )
+    RAW_MESSAGES = Dataset(
+        "RAW_MESSAGES", "mailkit.report.raw.messages", "raw messages", "raw_messages.csv", "ID_send_message"
+    )
+    # WARNING: TYPO in Mailkit API 🤯 ----------------------------------------------------------> 👇
+    RAW_BOUNCES = Dataset(
+        "RAW_BOUNCES", "mailkit.report.raw.bounces", "raw bounces", "raw_bounces.csv", "ID_SEND_MESSGE"
+    )
+    RAW_RESPONSES = Dataset(
+        "RAW_RESPONSES", "mailkit.report.raw.responses", "raw responses", "raw_responses.csv", "ID_send_message"
+    )
+    MLIST_UNSUBSCRIBED = Dataset(
+        "MLIST_UNSUBSCRIBED", "mailkit.mailinglist.unsubscribed", "unsubscribed emails", "unsubscribed.csv", "EMAIL"
+    )
+
+    # The following enum values are not implemented in the current version as they were not used by the clients at all.
+    # We keep them here just for backwards compatibility of the configurations.
+    ALL = Dataset("ALL", "N/A")
+    REPORT_MSG = Dataset("REPORT_MSG", "mailkit.report.message", depends_on=[str(REPORT_CAMPAIGN)])
+    MSG_RECIPIENTS = Dataset("MSG_RECIPIENTS", "mailkit.report.message.recipients", depends_on=[str(REPORT_CAMPAIGN)])
+    MSG_FEEDBACK = Dataset("MSG_FEEDBACK", "mailkit.report.message.feedback", depends_on=[str(REPORT_CAMPAIGN)])
+    LINKS_VISITORS = Dataset(
+        "LINKS_VISITORS", "mailkit.report.message.links.visitors", depends_on=[str(REPORT_CAMPAIGN)]
+    )  # this dataset has one more dependency (ID_URL)
+    MSG_BOUNCES = Dataset("MSG_BOUNCES", "mailkit.report.message.bounces", depends_on=[str(REPORT_CAMPAIGN)])
+
+
+class DateRangeEnum(str, Enum):
+    RELATIVE = "relative"
+    ABSOLUTE = "absolute"
 
 
 class Configuration(BaseModel):
-    print_hello: bool
-    api_token: str = Field(alias="#api_token")
-    debug: bool = False
+    client_id: str = Field(alias="clientId")
+    client_md5: str = Field(alias="#clientMd5")
 
-    def __init__(self, **data):
-        try:
-            super().__init__(**data)
-        except ValidationError as e:
-            error_messages = [f"{err['loc'][0]}: {err['msg']}" for err in e.errors()]
-            raise UserException(f"Validation Error: {', '.join(error_messages)}")
+    datasets: list[DatasetsEnum] = Field(default_factory=list)
 
-        if self.debug:
-            logging.debug("Component will run in Debug mode")
+    date_range: DateRangeEnum = Field(alias="dateRange", default=DateRangeEnum.RELATIVE)
 
-    @field_validator("api_token")
-    def token_must_be_uppercase(cls, v):
-        if not v.isupper():
-            raise UserException("API token must be uppercase")
-        return v
+    days_period: int | None = Field(alias="daysPeriod", default=7)
+    date_from: str | None = Field(alias="dateFrom", default="")  # TODO: Pydantic validation
+    date_to: str | None = Field(alias="dateTo", default="")  # TODO: Pydantic validation
+
+    campaign_ids: list[str] = Field(alias="campaignIds", default_factory=list)
+
+    @computed_field
+    @cached_property
+    def date_range_to(self) -> str:
+        if self.date_range == DateRangeEnum.RELATIVE and self.days_period:
+            return date.today().isoformat()
+        if self.date_range == DateRangeEnum.ABSOLUTE:
+            return self.date_to or ""
+        return ""
+
+    @computed_field
+    @cached_property
+    def date_range_from(self) -> str:
+        if self.date_range == DateRangeEnum.RELATIVE and self.days_period:
+            date_from = date.today() - timedelta(days=self.days_period)
+            return date_from.isoformat()
+        if self.date_range == DateRangeEnum.ABSOLUTE:
+            return self.date_from or ""
+        return ""
