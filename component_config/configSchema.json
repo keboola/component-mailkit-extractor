@@ -1,6 +1,6 @@
 {
   "type": "object",
-  "title": "Mailkit extractor KBC configuration",
+  "title": "Configuration",
   "required": [
     "clientId",
     "#clientMd5",
