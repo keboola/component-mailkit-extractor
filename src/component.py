@@ -71,8 +71,7 @@ class Component(ComponentBase):
                         ds.api_function,
                     )
 
-            if data is not None:
-                self._write_results(ds.filename, data, ds.primary_key)
+            self._write_results(ds, data)
 
     def _get_fieldnames(self, data: list[dict], primary_key: str) -> list[str]:
         fieldnames = set()
@@ -85,15 +84,16 @@ class Component(ComponentBase):
         fieldnames.remove(primary_key)
         return [primary_key] + sorted(list(fieldnames))
 
-    def _write_results(self, filename: str, data: list[dict], primary_key: str):
-        table = self.create_out_table_definition(filename, incremental=True, primary_key=[primary_key])
+    def _write_results(self, ds: Dataset, data: list[dict] | None) -> None:
+        if not data:
+            logging.warning("No data in the %s dataset", ds.title)
+            return
+
+        logging.info("Writing %s items to %s", len(data), ds.filename)
+        table = self.create_out_table_definition(ds.filename, incremental=True, primary_key=[ds.primary_key])
 
         with open(table.full_path, mode="w", encoding="utf-8", newline="") as out_file:
-            if not data:
-                logging.warning("No data to write to the output file.")
-                return
-
-            fieldnames = self._get_fieldnames(data, primary_key)
+            fieldnames = self._get_fieldnames(data, ds.primary_key)
             writer = csv.DictWriter(out_file, fieldnames=fieldnames)
             writer.writeheader()
             for row in data:
