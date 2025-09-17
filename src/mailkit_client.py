@@ -52,7 +52,6 @@ class MailkitClient:
         payload = {
             "parameters": {},
         }
-        # TODO: date validation
         if date_from:
             payload["parameters"]["range_from"] = date_from
         if date_to:

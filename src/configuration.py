@@ -55,7 +55,7 @@ class DatasetsEnum(Enum):
     RAW_MESSAGES = Dataset(
         "RAW_MESSAGES", "mailkit.report.raw.messages", "raw messages", "raw_messages.csv", "ID_send_message"
     )
-    # TODO: TYPO in Mailkit API 🤯 -------------------------------------------------------------> 👇
+    # WARNING: TYPO in Mailkit API 🤯 ----------------------------------------------------------> 👇
     RAW_BOUNCES = Dataset(
         "RAW_BOUNCES", "mailkit.report.raw.bounces", "raw bounces", "raw_bounces.csv", "ID_SEND_MESSGE"
     )
@@ -87,8 +87,8 @@ class Configuration(BaseModel):
     date_range: DateRangeEnum | None = Field(alias="dateRange", default=None)
 
     days_period: int | None = Field(alias="daysPeriod", default=0)
-    date_from: str | None = Field(alias="dateFrom", default="")
-    date_to: str | None = Field(alias="dateTo", default="")
+    date_from: str | None = Field(alias="dateFrom", default="")  # TODO: Pydantic validation
+    date_to: str | None = Field(alias="dateTo", default="")  # TODO: Pydantic validation
 
     campaign_ids: list[str] = Field(alias="campaignIds", default_factory=list)
 
