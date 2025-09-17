@@ -59,18 +59,16 @@
     "dateRange": {
       "enum": [
         "relative",
-        "absolute",
-        ""
+        "absolute"
       ],
       "type": "string",
       "format": "radio",
       "title": "Date Range",
-      "default": "",
+      "default": "relative",
       "options": {
         "enum_titles": [
           "Relative",
-          "Absolute",
-          "Not set (old configuration)"
+          "Absolute"
         ]
       },
       "propertyOrder": 50

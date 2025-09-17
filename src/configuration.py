@@ -28,12 +28,6 @@ class Dataset:
         return False
 
 
-class DateRangeEnum(str, Enum):
-    RELATIVE = "relative"
-    ABSOLUTE = "absolute"
-    NOT_SET = ""
-
-
 class DatasetsEnum(Enum):
     """
     The order of the datasets here matters, as certain reports depend on previous ones.
@@ -78,40 +72,40 @@ class DatasetsEnum(Enum):
     MSG_BOUNCES = Dataset("MSG_BOUNCES", "mailkit.report.message.bounces", depends_on=[str(REPORT_CAMPAIGN)])
 
 
+class DateRangeEnum(str, Enum):
+    RELATIVE = "relative"
+    ABSOLUTE = "absolute"
+
+
 class Configuration(BaseModel):
     client_id: str = Field(alias="clientId")
     client_md5: str = Field(alias="#clientMd5")
 
     datasets: list[DatasetsEnum] = Field(default_factory=list)
 
-    date_range: DateRangeEnum | None = Field(alias="dateRange", default=None)
+    date_range: DateRangeEnum = Field(alias="dateRange", default=DateRangeEnum.RELATIVE)
 
-    days_period: int | None = Field(alias="daysPeriod", default=0)
+    days_period: int | None = Field(alias="daysPeriod", default=7)
     date_from: str | None = Field(alias="dateFrom", default="")  # TODO: Pydantic validation
     date_to: str | None = Field(alias="dateTo", default="")  # TODO: Pydantic validation
 
     campaign_ids: list[str] = Field(alias="campaignIds", default_factory=list)
 
-    # obsolete, deprecated parameter, never implemented even in the previous versions
-    # keeping it here just for configuration compatibility
-    since_last_run: bool = Field(alias="sinceLastRun", default=False)
-
     @computed_field
     @cached_property
     def date_range_to(self) -> str:
-        if self.date_range != DateRangeEnum.ABSOLUTE and self.days_period:
+        if self.date_range == DateRangeEnum.RELATIVE and self.days_period:
             return date.today().isoformat()
-        if self.date_range != DateRangeEnum.RELATIVE:
+        if self.date_range == DateRangeEnum.ABSOLUTE:
             return self.date_to or ""
         return ""
 
     @computed_field
     @cached_property
     def date_range_from(self) -> str:
-        # the conditions are written this way in order to support old condigurations with date_range not set at all
-        if self.date_range != DateRangeEnum.ABSOLUTE and self.days_period:
+        if self.date_range == DateRangeEnum.RELATIVE and self.days_period:
             date_from = date.today() - timedelta(days=self.days_period)
             return date_from.isoformat()
-        if self.date_range != DateRangeEnum.RELATIVE:
+        if self.date_range == DateRangeEnum.ABSOLUTE:
             return self.date_from or ""
         return ""
