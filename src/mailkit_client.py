@@ -1,5 +1,6 @@
 import logging
 from dataclasses import dataclass
+from typing import Any
 
 import requests
 from keboola.component.exceptions import UserException
@@ -7,6 +8,13 @@ from keboola.component.exceptions import UserException
 from configuration import Dataset
 
 ENDPOINT = "https://api.mailkit.eu/json.fcgi"
+BATCH_SIZE = 5_000
+
+
+@dataclass
+class PagingResult:
+    items: list[dict]
+    next_id: str
 
 
 @dataclass
@@ -84,13 +92,25 @@ class MailkitClient:
                 "ID_send": id_send,
             },
         }
+        # result = self._call_api(ds, payload)
         return self._call_api(ds, payload)
 
-    def raw_messages_bounces_responses(self, ds: Dataset) -> list | None:
+    def raw_messages_bounces_responses(self, ds: Dataset, next_id: str = "") -> PagingResult:
         # https://www.mailkit.com/cz/podpora/api/statistiky/mailkitreportrawmessages
         # https://www.mailkit.com/cz/podpora/api/statistiky/mailkitreportrawbounces
         # https://www.mailkit.com/cz/podpora/api/statistiky/mailkitreportrawresponses
-        return self._call_api(ds, {})
+        payload: dict[str, Any] = {
+            "parameters": {
+                "limit": BATCH_SIZE,
+            },
+        }
+        if next_id:
+            payload["parameters"][ds.primary_key] = next_id
+
+        items = self._call_api(ds, payload)
+        if items:
+            next_id = items[-1].get(ds.primary_key)  # using last ID as next_id
+        return PagingResult(items or [], next_id)
 
     def mailinglist_unsubscribed(self, ds: Dataset, date_from: str) -> list | None:
         # https://www.mailkit.com/cz/podpora/api/statistiky/mailkitmalinglistunsubscribed

@@ -49,9 +49,8 @@ class DatasetsEnum(Enum):
     RAW_MESSAGES = Dataset(
         "RAW_MESSAGES", "mailkit.report.raw.messages", "raw messages", "raw_messages.csv", "ID_send_message"
     )
-    # WARNING: TYPO in Mailkit API 🤯 ----------------------------------------------------------> 👇
     RAW_BOUNCES = Dataset(
-        "RAW_BOUNCES", "mailkit.report.raw.bounces", "raw bounces", "raw_bounces.csv", "ID_SEND_MESSGE"
+        "RAW_BOUNCES", "mailkit.report.raw.bounces", "raw bounces", "raw_bounces.csv", "ID_UNDELIVERED_LOG"
     )
     RAW_RESPONSES = Dataset(
         "RAW_RESPONSES", "mailkit.report.raw.responses", "raw responses", "raw_responses.csv", "ID_send_message"

@@ -1,12 +1,21 @@
 import csv
 import logging
+from dataclasses import dataclass
 
 from keboola.component import sync_actions
 from keboola.component.base import ComponentBase, sync_action
+from keboola.component.dao import TableDefinition
 from keboola.component.exceptions import UserException
 
 from configuration import Configuration, Dataset, DatasetsEnum
 from mailkit_client import MailkitClient
+
+
+@dataclass
+class WriterCacheEntry:
+    table: TableDefinition
+    fieldnames: list[str]
+    last_row_id: str
 
 
 class Component(ComponentBase):
@@ -17,6 +26,8 @@ class Component(ComponentBase):
         self.mkc = MailkitClient(self.params.client_id, self.params.client_md5)
         self.campaign_ids: list[str] = self.params.campaign_ids or []
         self.send_ids: set[str] = set()
+
+        self.writer_cache = {}
 
     def run(self):
         date_from = self.params.date_range_from
@@ -49,6 +60,7 @@ class Component(ComponentBase):
             ds = dataset.value
 
             data = None
+            write_at_once = True
             logging.info(f"Processing dataset: {ds.title}")
             match dataset:
                 case DatasetsEnum.CAMPAIGNS:
@@ -60,7 +72,8 @@ class Component(ComponentBase):
                 case DatasetsEnum.MSG_LINKS:
                     data = self._get_message_links(ds)
                 case DatasetsEnum.RAW_MESSAGES | DatasetsEnum.RAW_BOUNCES | DatasetsEnum.RAW_RESPONSES:
-                    data = self._get_raw_messages_bounces_responses(ds)
+                    self._get_raw_messages_bounces_responses(ds)
+                    write_at_once = False
                 case DatasetsEnum.MLIST_UNSUBSCRIBED:
                     data = self._get_mailinglist_unsubscribed(ds, date_from)
                 case _:
@@ -70,8 +83,8 @@ class Component(ComponentBase):
                         ds.title,
                         ds.api_function,
                     )
-
-            self._write_results(ds, data)
+            if write_at_once:
+                self._write_results(ds, data)
 
     def _get_fieldnames(self, data: list[dict], primary_key: str) -> list[str]:
         fieldnames = set()
@@ -89,17 +102,29 @@ class Component(ComponentBase):
             logging.warning("No data in the %s dataset", ds.title)
             return
 
-        logging.info("Writing %s items to %s", len(data), ds.filename)
-        table = self.create_out_table_definition(ds.filename, incremental=True, primary_key=[ds.primary_key])
-
-        with open(table.full_path, mode="w", encoding="utf-8", newline="") as out_file:
+        if ds.filename not in self.writer_cache:
+            logging.info("Writing %s items to %s", len(data), ds.filename)
+            table = self.create_out_table_definition(ds.filename, incremental=True, primary_key=[ds.primary_key])
             fieldnames = self._get_fieldnames(data, ds.primary_key)
-            writer = csv.DictWriter(out_file, fieldnames=fieldnames)
-            writer.writeheader()
-            for row in data:
-                writer.writerow(row)
 
-        self.write_manifest(table)
+            with open(table.full_path, mode="w", encoding="utf-8", newline="") as out_file:
+                cached_writer = csv.DictWriter(out_file, fieldnames=fieldnames)
+                cached_writer.writeheader()
+                self.writer_cache[ds.filename] = WriterCacheEntry(table, fieldnames, "")
+
+            self.write_manifest(table)
+
+        wc_entry = self.writer_cache[ds.filename]  # :-)
+        table = wc_entry.table
+        fieldnames = wc_entry.fieldnames
+        last_row_id = wc_entry.last_row_id
+
+        with open(table.full_path, mode="a", encoding="utf-8", newline="") as out_file:
+            writer = csv.DictWriter(out_file, fieldnames=fieldnames)
+            for row in data:
+                if row[ds.primary_key] == last_row_id:
+                    continue
+                writer.writerow(row)
 
     def _get_campaigns(self, ds: Dataset) -> list[dict]:
         campaigns = []
@@ -150,10 +175,13 @@ class Component(ComponentBase):
 
         return links
 
-    def _get_raw_messages_bounces_responses(self, ds: Dataset) -> list[dict]:
-        if data := self.mkc.raw_messages_bounces_responses(ds):
-            return data
-        return []
+    def _get_raw_messages_bounces_responses(self, ds: Dataset, next_id: str = "") -> None:
+        paging_response = self.mkc.raw_messages_bounces_responses(ds, next_id)
+        if data := paging_response.items:
+            self._write_results(ds, data)
+            if paging_response.next_id and paging_response.next_id != next_id:
+                logging.info("Fetching next page of %s dataset, starting from ID %s", ds.title, paging_response.next_id)
+                self._get_raw_messages_bounces_responses(ds, paging_response.next_id)
 
     def _get_mailinglist_unsubscribed(self, ds: Dataset, date_from: str) -> list[dict]:
         if data := self.mkc.mailinglist_unsubscribed(ds, date_from):
