@@ -179,6 +179,7 @@ class Component(ComponentBase):
         paging_response = self.mkc.raw_messages_bounces_responses(ds, next_id)
         if data := paging_response.items:
             self._write_results(ds, data)
+            paging_response.items.clear()
             if paging_response.next_id and paging_response.next_id != next_id:
                 logging.info("Fetching next page of %s dataset, starting from ID %s", ds.title, paging_response.next_id)
                 self._get_raw_messages_bounces_responses(ds, paging_response.next_id)
