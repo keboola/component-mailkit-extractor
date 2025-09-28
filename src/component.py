@@ -125,6 +125,7 @@ class Component(ComponentBase):
                 if row[ds.primary_key] == last_row_id:
                     continue
                 writer.writerow(row)
+                wc_entry.last_row_id = row[ds.primary_key]
 
     def _get_campaigns(self, ds: Dataset) -> list[dict]:
         campaigns = []
