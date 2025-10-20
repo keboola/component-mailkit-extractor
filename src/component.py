@@ -86,7 +86,8 @@ class Component(ComponentBase):
             if write_at_once:
                 self._write_results(ds, data)
 
-    def _get_fieldnames(self, data: list[dict], primary_key: str) -> list[str]:
+    @staticmethod
+    def _get_fieldnames(data: list[dict], primary_key: str) -> list[str]:
         fieldnames = set()
         for row in data:
             if primary_key not in row:
@@ -178,10 +179,10 @@ class Component(ComponentBase):
 
         return links
 
-    def _get_raw_items(self, ds: Dataset, campaign_id: str = "", next_id: str = "") -> None:
+    def _get_raw_items(self, ds: Dataset) -> None:
         campaign_ids = self.campaign_ids or [""]
         for campaign_id in campaign_ids:
-            self._get_raw_items_by_campaign(ds, campaign_id, next_id)
+            self._get_raw_items_by_campaign(ds, campaign_id)
 
     def _get_raw_items_by_campaign(self, ds: Dataset, campaign_id: str = "", next_id: str = "") -> None:
         paging_response = self.mkc.raw_messages_bounces_responses(ds, campaign_id, next_id)
