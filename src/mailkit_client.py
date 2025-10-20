@@ -48,7 +48,7 @@ class MailkitClient:
 
         return None
 
-    def campaigns_list(self, ds: Dataset, campaign_id: str) -> list | None:
+    def campaigns_list(self, ds: Dataset, campaign_id: str = "") -> list | None:
         # https://www.mailkit.com/cz/podpora/api/sprava-kampani/mailkitcampaignslist
         payload = {}
         if campaign_id:
@@ -85,17 +85,19 @@ class MailkitClient:
             payload["parameters"]["range_to"] = date_to
         return self._call_api(ds, payload)
 
-    def message_links(self, ds: Dataset, id_send: str) -> list | None:
+    def message_links(self, ds: Dataset, id_send: str, campaign_id: str = "") -> list | None:
         # https://www.mailkit.com/cz/podpora/api/statistiky/mailkitreportmessagelinks
         payload = {
             "parameters": {
                 "ID_send": id_send,
             },
         }
-        # result = self._call_api(ds, payload)
+        if campaign_id:
+            payload["parameters"]["ID_message"] = campaign_id
+
         return self._call_api(ds, payload)
 
-    def raw_messages_bounces_responses(self, ds: Dataset, next_id: str = "") -> PagingResult:
+    def raw_messages_bounces_responses(self, ds: Dataset, campaign_id: str = "", next_id: str = "") -> PagingResult:
         # https://www.mailkit.com/cz/podpora/api/statistiky/mailkitreportrawmessages
         # https://www.mailkit.com/cz/podpora/api/statistiky/mailkitreportrawbounces
         # https://www.mailkit.com/cz/podpora/api/statistiky/mailkitreportrawresponses
@@ -104,12 +106,15 @@ class MailkitClient:
                 "limit": BATCH_SIZE,
             },
         }
+        if campaign_id:
+            payload["parameters"]["ID_message"] = campaign_id
         if next_id:
             payload["parameters"][ds.primary_key] = next_id
 
         items = self._call_api(ds, payload)
         if items:
             next_id = items[-1].get(ds.primary_key)  # using last ID as next_id
+
         return PagingResult(items or [], next_id)
 
     def mailinglist_unsubscribed(self, ds: Dataset, date_from: str) -> list | None:

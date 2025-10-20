@@ -72,7 +72,7 @@ class Component(ComponentBase):
                 case DatasetsEnum.MSG_LINKS:
                     data = self._get_message_links(ds)
                 case DatasetsEnum.RAW_MESSAGES | DatasetsEnum.RAW_BOUNCES | DatasetsEnum.RAW_RESPONSES:
-                    self._get_raw_messages_bounces_responses(ds)
+                    self._get_raw_items(ds)
                     write_at_once = False
                 case DatasetsEnum.MLIST_UNSUBSCRIBED:
                     data = self._get_mailinglist_unsubscribed(ds, date_from)
@@ -86,7 +86,8 @@ class Component(ComponentBase):
             if write_at_once:
                 self._write_results(ds, data)
 
-    def _get_fieldnames(self, data: list[dict], primary_key: str) -> list[str]:
+    @staticmethod
+    def _get_fieldnames(data: list[dict], primary_key: str) -> list[str]:
         fieldnames = set()
         for row in data:
             if primary_key not in row:
@@ -125,6 +126,7 @@ class Component(ComponentBase):
                 if row[ds.primary_key] == last_row_id:
                     continue
                 writer.writerow(row)
+                wc_entry.last_row_id = row[ds.primary_key]
 
     def _get_campaigns(self, ds: Dataset) -> list[dict]:
         campaigns = []
@@ -169,20 +171,27 @@ class Component(ComponentBase):
     def _get_message_links(self, ds: Dataset) -> list[dict]:
         links = []
 
-        for send_id in self.send_ids:
-            if data := self.mkc.message_links(ds, send_id):
-                links.extend(data)
+        campaign_ids = self.campaign_ids or [""]
+        for campaign_id in campaign_ids:
+            for send_id in self.send_ids:
+                if data := self.mkc.message_links(ds, send_id, campaign_id):
+                    links.extend(data)
 
         return links
 
-    def _get_raw_messages_bounces_responses(self, ds: Dataset, next_id: str = "") -> None:
-        paging_response = self.mkc.raw_messages_bounces_responses(ds, next_id)
+    def _get_raw_items(self, ds: Dataset) -> None:
+        campaign_ids = self.campaign_ids or [""]
+        for campaign_id in campaign_ids:
+            self._get_raw_items_by_campaign(ds, campaign_id)
+
+    def _get_raw_items_by_campaign(self, ds: Dataset, campaign_id: str = "", next_id: str = "") -> None:
+        paging_response = self.mkc.raw_messages_bounces_responses(ds, campaign_id, next_id)
         if data := paging_response.items:
             self._write_results(ds, data)
             paging_response.items.clear()
             if paging_response.next_id and paging_response.next_id != next_id:
                 logging.info("Fetching next page of %s dataset, starting from ID %s", ds.title, paging_response.next_id)
-                self._get_raw_messages_bounces_responses(ds, paging_response.next_id)
+                self._get_raw_items_by_campaign(ds, campaign_id, paging_response.next_id)
 
     def _get_mailinglist_unsubscribed(self, ds: Dataset, date_from: str) -> list[dict]:
         if data := self.mkc.mailinglist_unsubscribed(ds, date_from):
@@ -191,7 +200,7 @@ class Component(ComponentBase):
 
     @sync_action("verifyCredentials")
     def verify_credentials(self):
-        if self.mkc.campaigns_list(DatasetsEnum.CAMPAIGNS.value, ""):
+        if self.mkc.campaigns_list(DatasetsEnum.CAMPAIGNS.value):
             return sync_actions.ValidationResult("Verification successful", sync_actions.MessageType.SUCCESS)
         return sync_actions.ValidationResult("Failed to verify credentials", sync_actions.MessageType.ERROR)
 

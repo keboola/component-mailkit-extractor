@@ -36,7 +36,12 @@ class DatasetsEnum(Enum):
     CAMPAIGNS = Dataset("CAMPAIGNS", "mailkit.campaigns.list", "list of campaigns", "campaigns.csv", "ID_MESSAGE")
     REPORT = Dataset("REPORT", "mailkit.report", "summary report", "summaryreport.csv", "ID_MESSAGE")
     REPORT_CAMPAIGN = Dataset(
-        "REPORT_CAMPAIGN", "mailkit.report.campaign", "campaign reports", "campaignreports.csv", "ID_SEND"
+        "REPORT_CAMPAIGN",
+        "mailkit.report.campaign",
+        "campaign reports",
+        "campaignreports.csv",
+        "ID_SEND",
+        depends_on=[str(REPORT)],  # ID_MESSAGE is mandatory, we use values loaded in REPORT (if not defined by user)
     )
     MSG_LINKS = Dataset(
         "MSG_LINKS",
@@ -44,7 +49,7 @@ class DatasetsEnum(Enum):
         "message links",
         "links.csv",
         "ID_URL",
-        depends_on=[str(REPORT_CAMPAIGN)],
+        depends_on=[str(REPORT_CAMPAIGN)],  # ID_SEND is mandatory, we use values loaded in REPORT_CAMPAIGN
     )
     RAW_MESSAGES = Dataset(
         "RAW_MESSAGES", "mailkit.report.raw.messages", "raw messages", "raw_messages.csv", "ID_send_message"
