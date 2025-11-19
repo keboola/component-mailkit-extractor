@@ -1,84 +1,34 @@
-Mailkit Extractor
-=============
+# Component Mailkit Extractor
 
-Description
+This component extracts data from Mailkit API and stores it in Keboola.
 
-**Table of Contents:**
+## Configuration Parameters
 
-[TOC]
+- `clientId` (string): Client ID as stated in Mailkit (Profil – Integrace – API ID)
+- `#clientMd5` (string): Client MD5 as stated in Mailkit (Profil – Integrace – MD5 kód)
+- `datasets` (array): List of datasets to extract. Available options:
+  - `CAMPAIGNS`: List of campaigns
+  - `REPORT`: Summary report
+  - `REPORT_CAMPAIGN`: Campaign reports
+  - `MSG_LINKS`: Message links
+  - `RAW_MESSAGES`: Raw messages
+  - `RAW_BOUNCES`: Raw bounces
+  - `RAW_RESPONSES`: Raw responses
+  - `MLIST_UNSUBSCRIBED`: Unsubscribed emails
+- `dateRange` (string): Type of date range filter. Options: `relative` or `absolute`
+- `daysPeriod` (integer): Number of days to fetch (for relative date range). Default: 7
+- `dateFrom` (string): Start date in ISO format (for absolute date range)
+- `dateTo` (string): End date in ISO format (for absolute date range)
+- `campaignIds` (array): Optional list of specific campaign IDs to extract
 
-Functionality Notes
-===================
+### Example Configuration
 
-Prerequisites
-=============
-
-Ensure you have the necessary API token, register the application, etc.
-
-Features
-========
-
-| **Feature**             | **Description**                               |
-|-------------------------|-----------------------------------------------|
-| Generic UI Form         | Dynamic UI form for easy configuration.       |
-| Row-Based Configuration | Allows structuring the configuration in rows. |
-| OAuth                   | OAuth authentication enabled.                 |
-| Incremental Loading     | Fetch data in new increments.                 |
-| Backfill Mode           | Supports seamless backfill setup.             |
-| Date Range Filter       | Specify the date range for data retrieval.    |
-
-Supported Endpoints
-===================
-
-If you need additional endpoints, please submit your request to
-[ideas.keboola.com](https://ideas.keboola.com/).
-
-Configuration
-=============
-
-Param 1
--------
-Details about parameter 1.
-
-Param 2
--------
-Details about parameter 2.
-
-Output
-======
-
-Provides a list of tables, foreign keys, and schema.
-
-Development
------------
-
-To customize the local data folder path, replace the `CUSTOM_FOLDER` placeholder with your desired path in the `docker-compose.yml` file:
-
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-    volumes:
-      - ./:/code
-      - ./CUSTOM_FOLDER:/data
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-Clone this repository, initialize the workspace, and run the component using the following
-commands:
-
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-git clone https://github.com/keboola/component-mailkit-extractor component-mailkit-extractor
-cd component-mailkit-extractor
-docker-compose build
-docker-compose run --rm dev
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-Run the test suite and perform lint checks using this command:
-
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-docker-compose run --rm test
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-Integration
-===========
-
-For details about deployment and integration with Keboola, refer to the
-[deployment section of the developer
-documentation](https://developers.keboola.com/extend/component/deployment/).
+```json
+{
+  "clientId": "your-client-id",
+  "#clientMd5": "your-md5-hash",
+  "datasets": ["CAMPAIGNS", "REPORT", "RAW_BOUNCES"],
+  "dateRange": "relative",
+  "daysPeriod": 7
+}
+```
