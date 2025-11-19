@@ -13,6 +13,7 @@ class Dataset:
     description: str = ""
     filename: str = ""
     primary_key: str = ""
+    paging_key: str = ""
     depends_on: list[str] = field(default_factory=list)
 
     def __str__(self) -> str:
@@ -55,7 +56,12 @@ class DatasetsEnum(Enum):
         "RAW_MESSAGES", "mailkit.report.raw.messages", "raw messages", "raw_messages.csv", "ID_send_message"
     )
     RAW_BOUNCES = Dataset(
-        "RAW_BOUNCES", "mailkit.report.raw.bounces", "raw bounces", "raw_bounces.csv", "ID_UNDELIVERED_LOG"
+        "RAW_BOUNCES",
+        "mailkit.report.raw.bounces",
+        "raw bounces",
+        "raw_bounces.csv",
+        primary_key="ID_UNDELIVERED_LOG",  # holy cow!
+        paging_key="ID_undelivered_log",  # https://www.mailkit.com/cz/podpora/api/statistiky/mailkitreportrawbounces
     )
     RAW_RESPONSES = Dataset(
         "RAW_RESPONSES", "mailkit.report.raw.responses", "raw responses", "raw_responses.csv", "ID_send_message"

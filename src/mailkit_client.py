@@ -109,11 +109,13 @@ class MailkitClient:
         if campaign_id:
             payload["parameters"]["ID_message"] = campaign_id
         if next_id:
-            payload["parameters"][ds.primary_key] = next_id
+            # When filled in, the paging key is used, otherwise we fall back
+            # to the primary key (see RAW_BOUNCES dataset definition in configuration.py)
+            payload["parameters"][ds.paging_key or ds.primary_key] = next_id
 
         items = self._call_api(ds, payload)
         if items:
-            next_id = items[-1].get(ds.primary_key)  # using last ID as next_id
+            next_id = items[-1].get(ds.primary_key)  # use last item's id as next id
 
         return PagingResult(items or [], next_id)
 
