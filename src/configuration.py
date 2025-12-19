@@ -64,7 +64,7 @@ class DatasetsEnum(Enum):
         paging_key="ID_undelivered_log",  # https://www.mailkit.com/cz/podpora/api/statistiky/mailkitreportrawbounces
     )
     RAW_RESPONSES = Dataset(
-        "RAW_RESPONSES", "mailkit.report.raw.responses", "raw responses", "raw_responses.csv", "ID_send_message"
+        "RAW_RESPONSES", "mailkit.report.raw.responses", "raw responses", "raw_responses.csv", "ID_log"
     )
     MLIST_UNSUBSCRIBED = Dataset(
         "MLIST_UNSUBSCRIBED", "mailkit.mailinglist.unsubscribed", "unsubscribed emails", "unsubscribed.csv", "EMAIL"
