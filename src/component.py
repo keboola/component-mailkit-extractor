@@ -30,9 +30,25 @@ class Component(ComponentBase):
         self.writer_cache = {}
 
         # State file support for paging - load last seen IDs from state
-        # Structure: {endpoint_title: {campaign_id: last_id}}
+        # Structure: {last_seen_ids: {endpoint_title: {campaign_id: last_id}}, campaign_ids: [...]}
         state = self.get_state_file()
         self.last_seen_ids: dict[str, dict[str, str]] = state.get("last_seen_ids", {})
+        self._validate_campaign_ids_unchanged(state)
+
+    def _validate_campaign_ids_unchanged(self, state: dict) -> None:
+        """Check if campaign_ids changed since last run. Raise UserException if so."""
+        if not self.last_seen_ids:
+            return  # No existing state, nothing to validate
+        stored_campaign_ids = state.get("campaign_ids")
+        if stored_campaign_ids is None:
+            return  # Old state format without campaign_ids tracking
+        current_campaign_ids = sorted(self.params.campaign_ids or [])
+        if stored_campaign_ids != current_campaign_ids:
+            raise UserException(
+                "Campaign filter has changed since the last run. "
+                "To continue with the new filter, please clear the component state first. "
+                "You can do this in the component configuration by clicking 'Reset State'."
+            )
 
     def run(self):
         date_from = self.params.date_range_from
@@ -93,7 +109,10 @@ class Component(ComponentBase):
 
         # Write state file with last seen IDs for paging endpoints
         if self.last_seen_ids:
-            self.write_state_file({"last_seen_ids": self.last_seen_ids})
+            self.write_state_file({
+                "last_seen_ids": self.last_seen_ids,
+                "campaign_ids": sorted(self.params.campaign_ids or [])
+            })
             logging.info("State file saved: %s", self.last_seen_ids)
 
     @staticmethod
