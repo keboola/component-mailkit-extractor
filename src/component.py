@@ -72,7 +72,7 @@ class Component(ComponentBase):
                 case DatasetsEnum.MSG_LINKS:
                     data = self._get_message_links(ds)
                 case DatasetsEnum.RAW_MESSAGES | DatasetsEnum.RAW_BOUNCES | DatasetsEnum.RAW_RESPONSES:
-                    self._get_raw_items(ds)
+                    self._get_raw_items(ds, date_from, date_to)
                     write_at_once = False
                 case DatasetsEnum.MLIST_UNSUBSCRIBED:
                     data = self._get_mailinglist_unsubscribed(ds, date_from)
@@ -179,19 +179,21 @@ class Component(ComponentBase):
 
         return links
 
-    def _get_raw_items(self, ds: Dataset) -> None:
+    def _get_raw_items(self, ds: Dataset, date_from: str, date_to: str) -> None:
         campaign_ids = self.campaign_ids or [""]
         for campaign_id in campaign_ids:
-            self._get_raw_items_by_campaign(ds, campaign_id)
+            self._get_raw_items_by_campaign(ds, campaign_id, "", date_from, date_to)
 
-    def _get_raw_items_by_campaign(self, ds: Dataset, campaign_id: str = "", next_id: str = "") -> None:
-        paging_response = self.mkc.raw_messages_bounces_responses(ds, campaign_id, next_id)
+    def _get_raw_items_by_campaign(
+        self, ds: Dataset, campaign_id: str = "", next_id: str = "", date_from: str = "", date_to: str = ""
+    ) -> None:
+        paging_response = self.mkc.raw_messages_bounces_responses(ds, campaign_id, next_id, date_from, date_to)
         if data := paging_response.items:
             self._write_results(ds, data)
             paging_response.items.clear()
             if paging_response.next_id and paging_response.next_id != next_id:
                 logging.info("Fetching next page of %s dataset, starting from ID %s", ds.title, paging_response.next_id)
-                self._get_raw_items_by_campaign(ds, campaign_id, paging_response.next_id)
+                self._get_raw_items_by_campaign(ds, campaign_id, paging_response.next_id, date_from, date_to)
 
     def _get_mailinglist_unsubscribed(self, ds: Dataset, date_from: str) -> list[dict]:
         if data := self.mkc.mailinglist_unsubscribed(ds, date_from):

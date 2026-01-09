@@ -97,7 +97,14 @@ class MailkitClient:
 
         return self._call_api(ds, payload)
 
-    def raw_messages_bounces_responses(self, ds: Dataset, campaign_id: str = "", next_id: str = "") -> PagingResult:
+    def raw_messages_bounces_responses(
+        self,
+        ds: Dataset,
+        campaign_id: str = "",
+        next_id: str = "",
+        date_from: str = "",
+        date_to: str = "",
+    ) -> PagingResult:
         # https://www.mailkit.com/cz/podpora/api/statistiky/mailkitreportrawmessages
         # https://www.mailkit.com/cz/podpora/api/statistiky/mailkitreportrawbounces
         # https://www.mailkit.com/cz/podpora/api/statistiky/mailkitreportrawresponses
@@ -112,6 +119,10 @@ class MailkitClient:
             # When filled in, the paging key is used, otherwise we fall back
             # to the primary key (see RAW_BOUNCES dataset definition in configuration.py)
             payload["parameters"][ds.paging_key or ds.primary_key] = next_id
+        if date_from:
+            payload["parameters"]["range_from"] = date_from
+        if date_to:
+            payload["parameters"]["range_to"] = date_to
 
         items = self._call_api(ds, payload)
         if items:
