@@ -1,7 +1,6 @@
 import csv
 import logging
 from dataclasses import dataclass
-from datetime import datetime
 
 from keboola.component import sync_actions
 from keboola.component.base import ComponentBase, sync_action
@@ -10,14 +9,6 @@ from keboola.component.exceptions import UserException
 
 from configuration import Configuration, Dataset, DatasetsEnum
 from mailkit_client import MailkitClient
-
-# Date field names for client-side filtering of RAW_* datasets
-# The Mailkit API does not support server-side date filtering for raw endpoints
-RAW_DATE_FIELDS = {
-    DatasetsEnum.RAW_MESSAGES: "date_sent",
-    DatasetsEnum.RAW_RESPONSES: "date",
-    # RAW_BOUNCES does not have a date field in the API response
-}
 
 
 @dataclass
@@ -189,55 +180,54 @@ class Component(ComponentBase):
         return links
 
     def _get_raw_items(self, ds: Dataset, date_from: str, date_to: str) -> None:
-        campaign_ids = self.campaign_ids or [""]
-        for campaign_id in campaign_ids:
-            self._get_raw_items_by_campaign(ds, campaign_id, "", date_from, date_to)
+        """Fetch raw items with date filtering.
 
-    def _filter_raw_data_by_date(
-        self, dataset: DatasetsEnum, data: list[dict], date_from: str, date_to: str
-    ) -> list[dict]:
-        """Filter raw data by date range using client-side filtering.
+        If date filtering is enabled and we have send_ids (from REPORT_CAMPAIGN),
+        we fetch raw data only for those specific sends. This is much more efficient
+        than fetching all data and filtering client-side, because each send corresponds
+        to a specific sending event within the date range.
 
-        The Mailkit API does not support server-side date filtering for raw endpoints,
-        so we filter the data after fetching based on the date field in the response.
+        If no send_ids are available, we fall back to fetching by campaign_ids
+        (or all data if no campaign_ids are specified).
         """
-        date_field = RAW_DATE_FIELDS.get(dataset)
-        if not date_field or (not date_from and not date_to):
-            return data
+        if (date_from or date_to) and self.send_ids:
+            logging.info("Fetching %s for %d sends within date range", ds.title, len(self.send_ids))
+            for send_id in self.send_ids:
+                self._get_raw_items_by_send(ds, send_id)
+        else:
+            if date_from or date_to:
+                logging.warning(
+                    "Date filtering requested for %s but no send_ids available. "
+                    "Include REPORT_CAMPAIGN in datasets for efficient date filtering. "
+                    "Falling back to fetching all data.",
+                    ds.title,
+                )
+            campaign_ids = self.campaign_ids or [""]
+            for campaign_id in campaign_ids:
+                self._get_raw_items_by_campaign(ds, campaign_id)
 
-        filtered_data = []
-        for row in data:
-            row_date_str = row.get(date_field, "")
-            if not row_date_str:
-                continue
-            try:
-                row_date = datetime.fromisoformat(row_date_str.replace(" ", "T")).date().isoformat()
-                if date_from and row_date < date_from:
-                    continue
-                if date_to and row_date > date_to:
-                    continue
-                filtered_data.append(row)
-            except (ValueError, AttributeError):
-                filtered_data.append(row)
-
-        return filtered_data
-
-    def _get_raw_items_by_campaign(
-        self, ds: Dataset, campaign_id: str = "", next_id: str = "", date_from: str = "", date_to: str = ""
-    ) -> None:
-        dataset = next((d for d in DatasetsEnum if d.value == ds), None)
-        paging_response = self.mkc.raw_messages_bounces_responses(ds, campaign_id, next_id)
+    def _get_raw_items_by_send(self, ds: Dataset, send_id: str, next_id: str = "") -> None:
+        """Fetch raw items for a specific send ID."""
+        paging_response = self.mkc.raw_messages_bounces_responses(ds, campaign_id="", send_id=send_id, next_id=next_id)
         if data := paging_response.items:
-            if dataset and dataset in RAW_DATE_FIELDS:
-                original_count = len(data)
-                data = self._filter_raw_data_by_date(dataset, data, date_from, date_to)
-                if original_count != len(data):
-                    logging.info("Filtered %s: %d -> %d records (date range)", ds.title, original_count, len(data))
+            self._write_results(ds, data)
+            paging_response.items.clear()
+            if paging_response.next_id and paging_response.next_id != next_id:
+                logging.info(
+                    "Fetching next page of %s for send %s, starting from ID %s",
+                    ds.title, send_id, paging_response.next_id
+                )
+                self._get_raw_items_by_send(ds, send_id, paging_response.next_id)
+
+    def _get_raw_items_by_campaign(self, ds: Dataset, campaign_id: str = "", next_id: str = "") -> None:
+        """Fetch raw items for a specific campaign ID (fallback when no send_ids available)."""
+        paging_response = self.mkc.raw_messages_bounces_responses(ds, campaign_id=campaign_id, next_id=next_id)
+        if data := paging_response.items:
             self._write_results(ds, data)
             paging_response.items.clear()
             if paging_response.next_id and paging_response.next_id != next_id:
                 logging.info("Fetching next page of %s dataset, starting from ID %s", ds.title, paging_response.next_id)
-                self._get_raw_items_by_campaign(ds, campaign_id, paging_response.next_id, date_from, date_to)
+                self._get_raw_items_by_campaign(ds, campaign_id, paging_response.next_id)
 
     def _get_mailinglist_unsubscribed(self, ds: Dataset, date_from: str) -> list[dict]:
         if data := self.mkc.mailinglist_unsubscribed(ds, date_from):

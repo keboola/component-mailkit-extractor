@@ -98,13 +98,14 @@ class MailkitClient:
         return self._call_api(ds, payload)
 
     def raw_messages_bounces_responses(
-        self, ds: Dataset, campaign_id: str = "", next_id: str = ""
+        self, ds: Dataset, campaign_id: str = "", send_id: str = "", next_id: str = ""
     ) -> PagingResult:
         # https://www.mailkit.com/cz/podpora/api/statistiky/mailkitreportrawmessages
         # https://www.mailkit.com/cz/podpora/api/statistiky/mailkitreportrawbounces
         # https://www.mailkit.com/cz/podpora/api/statistiky/mailkitreportrawresponses
         # Note: These endpoints do NOT support date filtering via API parameters.
-        # Date filtering is done client-side in component.py after fetching the data.
+        # For date filtering, use send_id parameter to filter by specific sends
+        # (get send IDs from REPORT_CAMPAIGN which supports date filtering).
         payload: dict[str, Any] = {
             "parameters": {
                 "limit": BATCH_SIZE,
@@ -112,6 +113,8 @@ class MailkitClient:
         }
         if campaign_id:
             payload["parameters"]["ID_message"] = campaign_id
+        if send_id:
+            payload["parameters"]["ID_send"] = send_id
         if next_id:
             # When filled in, the paging key is used, otherwise we fall back
             # to the primary key (see RAW_BOUNCES dataset definition in configuration.py)
