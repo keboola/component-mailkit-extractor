@@ -41,16 +41,20 @@ class Component(ComponentBase):
             logging.info("No date range specified, fetching all data.")
 
         # ensure all dependencies are included
-        added_datasets = []
+        added_datasets: list[DatasetsEnum] = []
+        selected_titles = {d.value.title for d in self.params.datasets}
         for dataset in self.params.datasets:
-            for dep in dataset.value.depends_on:
-                if dep not in self.params.datasets:
-                    added_datasets.append(dep)
-                    logging.warning(
-                        "Adding dataset %s as a dependency of the selected %s dataset.",
-                        dep,
-                        dataset.value.title,
-                    )
+            for dep_title in dataset.value.depends_on:
+                if dep_title not in selected_titles:
+                    dep_enum = next((d for d in DatasetsEnum if d.value.title == dep_title), None)
+                    if dep_enum:
+                        added_datasets.append(dep_enum)
+                        selected_titles.add(dep_title)
+                        logging.warning(
+                            "Adding dataset %s as a dependency of the selected %s dataset.",
+                            dep_title,
+                            dataset.value.title,
+                        )
         self.params.datasets.extend(added_datasets)
 
         for dataset in DatasetsEnum:
