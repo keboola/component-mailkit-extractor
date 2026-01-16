@@ -109,10 +109,12 @@ class Component(ComponentBase):
 
         # Write state file with last seen IDs for paging endpoints
         if self.last_seen_ids:
-            self.write_state_file({
-                "last_seen_ids": self.last_seen_ids,
-                "campaign_ids": sorted(self.params.campaign_ids or [])
-            })
+            self.write_state_file(
+                {
+                    "last_seen_ids": self.last_seen_ids,
+                    "campaign_ids": sorted(self.params.campaign_ids or []),
+                }
+            )
             logging.info("State file saved: %s", self.last_seen_ids)
 
     @staticmethod
@@ -217,16 +219,14 @@ class Component(ComponentBase):
             if initial_next_id:
                 logging.info(
                     "Resuming %s dataset for campaign %s from ID: %s",
-                    ds.title, campaign_id or "(all)", initial_next_id
+                    ds.title,
+                    campaign_id or "(all)",
+                    initial_next_id,
                 )
             self._get_raw_items_by_campaign(ds, campaign_id, initial_next_id)
 
-    def _get_raw_items_by_campaign(
-        self, ds: Dataset, campaign_id: str = "", next_id: str = ""
-    ) -> None:
-        paging_response = self.mkc.raw_messages_bounces_responses(
-            ds, campaign_id, next_id
-        )
+    def _get_raw_items_by_campaign(self, ds: Dataset, campaign_id: str = "", next_id: str = "") -> None:
+        paging_response = self.mkc.raw_messages_bounces_responses(ds, campaign_id, next_id)
         if data := paging_response.items:
             self._write_results(ds, data)
             # Track the last seen ID for state file (per endpoint and campaign)
@@ -237,11 +237,10 @@ class Component(ComponentBase):
             if paging_response.next_id and paging_response.next_id != next_id:
                 logging.info(
                     "Fetching next page of %s dataset, starting from ID %s",
-                    ds.title, paging_response.next_id
+                    ds.title,
+                    paging_response.next_id,
                 )
-                self._get_raw_items_by_campaign(
-                    ds, campaign_id, paging_response.next_id
-                )
+                self._get_raw_items_by_campaign(ds, campaign_id, paging_response.next_id)
 
     def _get_mailinglist_unsubscribed(self, ds: Dataset, date_from: str) -> list[dict]:
         if data := self.mkc.mailinglist_unsubscribed(ds, date_from):
