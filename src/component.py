@@ -29,6 +29,27 @@ class Component(ComponentBase):
 
         self.writer_cache = {}
 
+        # State file support for paging - load last seen IDs from state
+        # Structure: {last_seen_ids: {endpoint_title: {campaign_id: last_id}}, campaign_ids: [...]}
+        state = self.get_state_file()
+        self.last_seen_ids: dict[str, dict[str, str]] = state.get("last_seen_ids", {})
+        self._validate_campaign_ids_unchanged(state)
+
+    def _validate_campaign_ids_unchanged(self, state: dict) -> None:
+        """Check if campaign_ids changed since last run. Raise UserException if so."""
+        if not self.last_seen_ids:
+            return  # No existing state, nothing to validate
+        stored_campaign_ids = state.get("campaign_ids")
+        if stored_campaign_ids is None:
+            return  # Old state format without campaign_ids tracking
+        current_campaign_ids = sorted(self.params.campaign_ids or [])
+        if stored_campaign_ids != current_campaign_ids:
+            raise UserException(
+                "Campaign filter has changed since the last run. "
+                "To continue with the new filter, please clear the component state first. "
+                "You can do this in the component configuration by clicking 'Reset State'."
+            )
+
     def run(self):
         date_from = self.params.date_range_from
         date_to = self.params.date_range_to
@@ -85,6 +106,16 @@ class Component(ComponentBase):
                     )
             if write_at_once:
                 self._write_results(ds, data)
+
+        # Write state file with last seen IDs for paging endpoints
+        if self.last_seen_ids:
+            self.write_state_file(
+                {
+                    "last_seen_ids": self.last_seen_ids,
+                    "campaign_ids": sorted(self.params.campaign_ids or []),
+                }
+            )
+            logging.info("State file saved: %s", self.last_seen_ids)
 
     @staticmethod
     def _get_fieldnames(data: list[dict], primary_key: str) -> list[str]:
@@ -182,15 +213,33 @@ class Component(ComponentBase):
     def _get_raw_items(self, ds: Dataset) -> None:
         campaign_ids = self.campaign_ids or [""]
         for campaign_id in campaign_ids:
-            self._get_raw_items_by_campaign(ds, campaign_id)
+            # Get initial next_id from state file for this specific campaign
+            endpoint_state = self.last_seen_ids.get(ds.title, {})
+            initial_next_id = endpoint_state.get(campaign_id, "")
+            if initial_next_id:
+                logging.info(
+                    "Resuming %s dataset for campaign %s from ID: %s",
+                    ds.title,
+                    campaign_id or "(all)",
+                    initial_next_id,
+                )
+            self._get_raw_items_by_campaign(ds, campaign_id, initial_next_id)
 
     def _get_raw_items_by_campaign(self, ds: Dataset, campaign_id: str = "", next_id: str = "") -> None:
         paging_response = self.mkc.raw_messages_bounces_responses(ds, campaign_id, next_id)
         if data := paging_response.items:
             self._write_results(ds, data)
+            # Track the last seen ID for state file (per endpoint and campaign)
+            if ds.title not in self.last_seen_ids:
+                self.last_seen_ids[ds.title] = {}
+            self.last_seen_ids[ds.title][campaign_id] = paging_response.next_id
             paging_response.items.clear()
             if paging_response.next_id and paging_response.next_id != next_id:
-                logging.info("Fetching next page of %s dataset, starting from ID %s", ds.title, paging_response.next_id)
+                logging.info(
+                    "Fetching next page of %s dataset, starting from ID %s",
+                    ds.title,
+                    paging_response.next_id,
+                )
                 self._get_raw_items_by_campaign(ds, campaign_id, paging_response.next_id)
 
     def _get_mailinglist_unsubscribed(self, ds: Dataset, date_from: str) -> list[dict]:
