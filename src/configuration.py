@@ -53,7 +53,12 @@ class DatasetsEnum(Enum):
         depends_on=[str(REPORT_CAMPAIGN)],  # ID_SEND is mandatory, we use values loaded in REPORT_CAMPAIGN
     )
     RAW_MESSAGES = Dataset(
-        "RAW_MESSAGES", "mailkit.report.raw.messages", "raw messages", "raw_messages.csv", "ID_send_message"
+        "RAW_MESSAGES",
+        "mailkit.report.raw.messages",
+        "raw messages",
+        "raw_messages.csv",
+        "ID_send_message",
+        depends_on=[str(REPORT_CAMPAIGN)],  # ID_MESSAGE+ID_SEND needed for date-filtered state tracking
     )
     RAW_BOUNCES = Dataset(
         "RAW_BOUNCES",
@@ -62,9 +67,15 @@ class DatasetsEnum(Enum):
         "raw_bounces.csv",
         primary_key="ID_UNDELIVERED_LOG",  # holy cow!
         paging_key="ID_undelivered_log",  # https://www.mailkit.com/cz/podpora/api/statistiky/mailkitreportrawbounces
+        depends_on=[str(REPORT_CAMPAIGN)],  # ID_MESSAGE+ID_SEND needed for date-filtered state tracking
     )
     RAW_RESPONSES = Dataset(
-        "RAW_RESPONSES", "mailkit.report.raw.responses", "raw responses", "raw_responses.csv", "ID_log"
+        "RAW_RESPONSES",
+        "mailkit.report.raw.responses",
+        "raw responses",
+        "raw_responses.csv",
+        "ID_log",
+        depends_on=[str(REPORT_CAMPAIGN)],  # ID_MESSAGE+ID_SEND needed for date-filtered state tracking
     )
     MLIST_UNSUBSCRIBED = Dataset(
         "MLIST_UNSUBSCRIBED", "mailkit.mailinglist.unsubscribed", "unsubscribed emails", "unsubscribed.csv", "EMAIL"

@@ -26,6 +26,7 @@ class Component(ComponentBase):
         self.mkc = MailkitClient(self.params.client_id, self.params.client_md5)
         self.campaign_ids: list[str] = self.params.campaign_ids or []
         self.send_ids: set[str] = set()
+        self.campaign_sends: list[dict] = []  # List of {ID_MESSAGE: ..., ID_SEND: ...} from REPORT_CAMPAIGN
 
         self.writer_cache = {}
 
@@ -193,12 +194,16 @@ class Component(ComponentBase):
 
         for campaign_id in self.campaign_ids:
             if data := self.mkc.campaign_reports(ds, campaign_id, date_from, date_to):
+                # API doesn't return ID_MESSAGE - add it for later use in combined state keys (campaign_id:send_id)
+                for record in data:
+                    record["ID_MESSAGE"] = campaign_id
                 campaigns.extend(data)
 
         if not campaigns:
             return []
 
         self.send_ids |= {c["ID_SEND"] for c in campaigns}
+        self.campaign_sends = campaigns  # Store for use in RAW_* endpoints
         logging.info("Parsing %s: %s unique sends", ds.description, len(self.send_ids))
 
         return campaigns
@@ -225,10 +230,23 @@ class Component(ComponentBase):
         If no send_ids are available, we fall back to fetching by campaign_ids
         (or all data if no campaign_ids are specified).
         """
-        if (date_from or date_to) and self.send_ids:
-            logging.info("Fetching %s for %d sends within date range", ds.title, len(self.send_ids))
-            for send_id in self.send_ids:
-                self._get_raw_items_by_send(ds, send_id)
+        if (date_from or date_to) and self.campaign_sends:
+            logging.info("Fetching %s for %d sends within date range", ds.title, len(self.campaign_sends))
+            for campaign_send in self.campaign_sends:
+                campaign_id = campaign_send["ID_MESSAGE"]
+                send_id = campaign_send["ID_SEND"]
+                state_key = f"{campaign_id}:{send_id}"
+                endpoint_state = self.last_seen_ids.get(ds.title, {})
+                initial_next_id = endpoint_state.get(state_key, "")
+                if initial_next_id:
+                    logging.info(
+                        "Resuming %s for campaign %s, send %s from ID: %s",
+                        ds.title,
+                        campaign_id,
+                        send_id,
+                        initial_next_id,
+                    )
+                self._get_raw_items_by_send(ds, campaign_id, send_id, initial_next_id)
         else:
             if date_from or date_to:
                 logging.warning(
@@ -251,18 +269,27 @@ class Component(ComponentBase):
                     )
                 self._get_raw_items_by_campaign(ds, campaign_id, initial_next_id)
 
-    def _get_raw_items_by_send(self, ds: Dataset, send_id: str, next_id: str = "") -> None:
-        """Fetch raw items for a specific send ID."""
-        paging_response = self.mkc.raw_messages_bounces_responses(ds, campaign_id="", send_id=send_id, next_id=next_id)
+    def _get_raw_items_by_send(self, ds: Dataset, campaign_id: str, send_id: str, next_id: str = "") -> None:
+        """Fetch raw items for a specific send ID with state tracking."""
+        paging_response = self.mkc.raw_messages_bounces_responses(
+            ds, campaign_id=campaign_id, send_id=send_id, next_id=next_id
+        )
         if data := paging_response.items:
             self._write_results(ds, data)
+            state_key = f"{campaign_id}:{send_id}"
+            if ds.title not in self.last_seen_ids:
+                self.last_seen_ids[ds.title] = {}
+            self.last_seen_ids[ds.title][state_key] = paging_response.next_id
             paging_response.items.clear()
             if paging_response.next_id and paging_response.next_id != next_id:
                 logging.info(
-                    "Fetching next page of %s for send %s, starting from ID %s",
-                    ds.title, send_id, paging_response.next_id
+                    "Fetching next page of %s for campaign %s, send %s, starting from ID %s",
+                    ds.title,
+                    campaign_id,
+                    send_id,
+                    paging_response.next_id,
                 )
-                self._get_raw_items_by_send(ds, send_id, paging_response.next_id)
+                self._get_raw_items_by_send(ds, campaign_id, send_id, paging_response.next_id)
 
     def _get_raw_items_by_campaign(self, ds: Dataset, campaign_id: str = "", next_id: str = "") -> None:
         """Fetch raw items for a specific campaign ID (fallback when no send_ids available)."""
