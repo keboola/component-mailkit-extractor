@@ -120,7 +120,7 @@ class Component(ComponentBase):
                     "campaign_ids": sorted(self.params.campaign_ids or []),
                 }
             )
-            logging.info("State file saved: %s", self.last_seen_ids)
+            logging.debug("State file saved: %s", self.last_seen_ids)
 
     @staticmethod
     def _get_fieldnames(data: list[dict], primary_key: str) -> list[str]:
@@ -239,7 +239,7 @@ class Component(ComponentBase):
                 endpoint_state = self.last_seen_ids.get(ds.title, {})
                 initial_next_id = endpoint_state.get(state_key, "")
                 if initial_next_id:
-                    logging.info(
+                    logging.debug(
                         "Resuming %s for campaign %s, send %s from ID: %s",
                         ds.title,
                         campaign_id,
@@ -261,7 +261,7 @@ class Component(ComponentBase):
                 endpoint_state = self.last_seen_ids.get(ds.title, {})
                 initial_next_id = endpoint_state.get(campaign_id, "")
                 if initial_next_id:
-                    logging.info(
+                    logging.debug(
                         "Resuming %s dataset for campaign %s from ID: %s",
                         ds.title,
                         campaign_id or "(all)",
@@ -282,7 +282,7 @@ class Component(ComponentBase):
             self.last_seen_ids[ds.title][state_key] = paging_response.next_id
             paging_response.items.clear()
             if paging_response.next_id and paging_response.next_id != next_id:
-                logging.info(
+                logging.debug(
                     "Fetching next page of %s for campaign %s, send %s, starting from ID %s",
                     ds.title,
                     campaign_id,
@@ -302,7 +302,7 @@ class Component(ComponentBase):
             self.last_seen_ids[ds.title][campaign_id] = paging_response.next_id
             paging_response.items.clear()
             if paging_response.next_id and paging_response.next_id != next_id:
-                logging.info(
+                logging.debug(
                     "Fetching next page of %s dataset, starting from ID %s",
                     ds.title,
                     paging_response.next_id,
