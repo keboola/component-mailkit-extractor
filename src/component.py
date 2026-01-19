@@ -48,7 +48,7 @@ class Component(ComponentBase):
             raise UserException(
                 "Campaign filter has changed since the last run. "
                 "To continue with the new filter, please clear the component state first. "
-                "You can do this in the component configuration by clicking 'Reset State'."
+                "You can do this on the Update State tab in Debug Mode."
             )
 
     def run(self):
