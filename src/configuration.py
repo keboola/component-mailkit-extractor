@@ -69,8 +69,16 @@ class DatasetsEnum(Enum):
     MLIST_UNSUBSCRIBED = Dataset(
         "MLIST_UNSUBSCRIBED", "mailkit.mailinglist.unsubscribed", "unsubscribed emails", "unsubscribed.csv", "EMAIL"
     )
+    ENGAGEMENT = Dataset(
+        "ENGAGEMENT",
+        "mailkit.mailinglist.engagement",
+        "engagement scores",
+        "engagement.csv",
+        "ID_EMAIL",
+        paging_key="ID_email",
+    )
 
-    # The following enum values are not implemented in the current version as they were not used by the clients at all.
+    # The following enum values are not implementedin the current version as they were not used by the clients at all.
     # We keep them here just for backwards compatibility of the configurations.
     ALL = Dataset("ALL", "N/A")
     REPORT_MSG = Dataset("REPORT_MSG", "mailkit.report.message", depends_on=[str(REPORT_CAMPAIGN)])
@@ -100,6 +108,7 @@ class Configuration(BaseModel):
     date_to: str | None = Field(alias="dateTo", default="")  # TODO: Pydantic validation
 
     campaign_ids: list[str] = Field(alias="campaignIds", default_factory=list)
+    mailing_list_ids: list[str] = Field(alias="mailingListIds", default_factory=list)
 
     @computed_field
     @cached_property

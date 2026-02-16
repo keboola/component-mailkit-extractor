@@ -51,7 +51,8 @@
           "RAW_MESSAGES",
           "RAW_BOUNCES",
           "RAW_RESPONSES",
-          "MLIST_UNSUBSCRIBED"
+          "MLIST_UNSUBSCRIBED",
+          "ENGAGEMENT"
         ]
       },
       "default": []
@@ -128,6 +129,18 @@
       },
       "options": {
         "tooltip": "If specified, only these campaigns will be downloaded"
+      }
+    },
+    "mailingListIds": {
+      "title": "Mailing List IDs",
+      "propertyOrder": 100,
+      "type": "array",
+      "items": {
+        "title": "Mailing List ID",
+        "type": "string"
+      },
+      "options": {
+        "tooltip": "Required for the ENGAGEMENT dataset. Specify the IDs of mailing lists to fetch engagement scores for."
       }
     }
   }

@@ -97,6 +97,9 @@ class Component(ComponentBase):
                     write_at_once = False
                 case DatasetsEnum.MLIST_UNSUBSCRIBED:
                     data = self._get_mailinglist_unsubscribed(ds, date_from)
+                case DatasetsEnum.ENGAGEMENT:
+                    self._get_engagement(ds)
+                    write_at_once = False
                 case _:
                     logging.warning(
                         "The %s dataset (API method: %s) is not implemented. If you believe this is an error, "
@@ -244,6 +247,31 @@ class Component(ComponentBase):
                 paging_response.next_id,
             )
             next_id = paging_response.next_id
+
+    def _get_engagement(self, ds: Dataset) -> None:
+        if not self.params.mailing_list_ids:
+            raise UserException(
+                "Mailing List IDs must be configured to fetch the ENGAGEMENT dataset. "
+                "Please add at least one mailing list ID in the configuration."
+            )
+        for list_id in self.params.mailing_list_ids:
+            logging.info("Fetching engagement scores for mailing list %s", list_id)
+            next_id = ""
+            while True:
+                paging_response = self.mkc.mailinglist_engagement(ds, list_id, id_email=next_id)
+                if not (data := paging_response.items):
+                    break
+                for row in data:
+                    row["ID_USER_LIST"] = list_id
+                self._write_results(ds, data)
+                paging_response.items.clear()
+                if not paging_response.next_id or paging_response.next_id == next_id:
+                    break
+                logging.info(
+                    "Fetching next page of engagement scores, starting from ID_email %s",
+                    paging_response.next_id,
+                )
+                next_id = paging_response.next_id
 
     def _get_mailinglist_unsubscribed(self, ds: Dataset, date_from: str) -> list[dict]:
         if data := self.mkc.mailinglist_unsubscribed(ds, date_from):

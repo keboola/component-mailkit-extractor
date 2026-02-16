@@ -119,6 +119,26 @@ class MailkitClient:
 
         return PagingResult(items or [], next_id)
 
+    def mailinglist_engagement(
+        self, ds: Dataset, id_user_list: str, id_email: str = "", limit: int = 25_000
+    ) -> PagingResult:
+        # https://www.mailkit.com/resources/api/mailing-list-management/mailkitmailinglistengagement
+        payload: dict[str, Any] = {
+            "parameters": {
+                "ID_user_list": id_user_list,
+                "limit": limit,
+            },
+        }
+        if id_email:
+            payload["parameters"]["ID_email"] = id_email
+
+        items = self._call_api(ds, payload)
+        next_id = ""
+        if items:
+            next_id = str(items[-1].get(ds.primary_key, ""))
+
+        return PagingResult(items or [], next_id)
+
     def mailinglist_unsubscribed(self, ds: Dataset, date_from: str) -> list | None:
         # https://www.mailkit.com/cz/podpora/api/statistiky/mailkitmalinglistunsubscribed
         payload = {}
