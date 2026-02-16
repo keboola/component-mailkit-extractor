@@ -250,12 +250,20 @@ class Component(ComponentBase):
             next_id = paging_response.next_id
 
     def _get_engagement(self, ds: Dataset) -> None:
-        if not self.params.mailing_list_ids:
-            raise UserException(
-                "Mailing List IDs must be configured to fetch the ENGAGEMENT dataset. "
-                "Please add at least one mailing list ID in the configuration."
-            )
-        for list_id in self.params.mailing_list_ids:
+        mailing_list_ids = self.params.mailing_list_ids
+        if not mailing_list_ids:
+            logging.info("No Mailing List IDs configured, fetching all mailing lists automatically.")
+            lists = self.mkc.mailinglist_list()
+            if not lists:
+                raise UserException(
+                    "Failed to fetch mailing lists from Mailkit. "
+                    "Please verify your credentials or specify Mailing List IDs manually."
+                )
+            mailing_list_ids = [ml["ID_USER_LIST"] for ml in lists if ml.get("STATUS") == "enabled"]
+            if not mailing_list_ids:
+                raise UserException("No enabled mailing lists found in your Mailkit account.")
+            logging.info("Auto-detected %s enabled mailing list(s): %s", len(mailing_list_ids), mailing_list_ids)
+        for list_id in mailing_list_ids:
             logging.info("Fetching engagement scores for mailing list %s", list_id)
             next_id = ""
             while True:

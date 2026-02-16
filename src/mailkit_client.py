@@ -119,6 +119,26 @@ class MailkitClient:
 
         return PagingResult(items or [], next_id)
 
+    def mailinglist_list(self) -> list | None:
+        # https://www.mailkit.com/resources/api/mailing-list-management/mailkitmailinglistlist
+        payload = {
+            "function": "mailkit.mailinglist.list",
+            "id": self.client_id,
+            "md5": self.client_md5,
+        }
+        try:
+            resp = requests.post(ENDPOINT, json=payload)
+            logging.debug("Mailkit API response: HTTP %i %s", resp.status_code, resp.reason)
+            if resp.status_code != 200:
+                raise UserException(f"mailkit.mailinglist.list error: {resp.text}")
+            result = resp.json()
+            if result:
+                logging.info("Getting mailing lists: OK (%i items)", len(result))
+            return result
+        except Exception as e:
+            logging.exception("Failed to get mailing lists: %s", e)
+        return None
+
     def mailinglist_engagement(
         self, ds: Dataset, id_user_list: str, id_email: str = "", limit: int = 25_000
     ) -> PagingResult:
