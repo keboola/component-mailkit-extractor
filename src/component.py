@@ -139,7 +139,8 @@ class Component(ComponentBase):
 
         if ds.filename not in self.writer_cache:
             logging.info("Writing %s items to %s", len(data), ds.filename)
-            table = self.create_out_table_definition(ds.filename, incremental=True, primary_key=[ds.primary_key])
+            all_primary_keys = [ds.primary_key] + ds.extra_primary_keys
+            table = self.create_out_table_definition(ds.filename, incremental=True, primary_key=all_primary_keys)
             fieldnames = self._get_fieldnames(data, ds.primary_key)
 
             with open(table.full_path, mode="w", encoding="utf-8", newline="") as out_file:
