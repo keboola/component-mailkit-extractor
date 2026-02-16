@@ -140,7 +140,7 @@
         "type": "string"
       },
       "options": {
-        "tooltip": "Required for the ENGAGEMENT dataset. Specify the IDs of mailing lists to fetch engagement scores for."
+        "tooltip": "Optional for the ENGAGEMENT dataset. If left empty, all enabled mailing lists are fetched automatically."
       }
     }
   }
