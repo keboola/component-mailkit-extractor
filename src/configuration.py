@@ -15,7 +15,6 @@ class Dataset:
     primary_key: str = ""
     paging_key: str = ""
     depends_on: list[str] = field(default_factory=list)
-    extra_primary_keys: list[str] = field(default_factory=list)
 
     def __str__(self) -> str:
         return self.title
@@ -77,7 +76,6 @@ class DatasetsEnum(Enum):
         "engagement.csv",
         "ID_EMAIL",
         paging_key="ID_email",
-        extra_primary_keys=["ID_USER_LIST"],
     )
 
     # The following enum values are not implemented in the current version as they were not used by the clients at all.
