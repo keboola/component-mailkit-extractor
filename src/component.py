@@ -281,28 +281,24 @@ class Component(ComponentBase):
                 raise UserException("No enabled mailing lists found in your Mailkit account.")
             logging.info("Auto-detected %s enabled mailing list(s): %s", len(mailing_list_ids), mailing_list_ids)
 
-        table: TableDefinition | None = None
-        fieldnames: list[str] | None = None
-
         for list_id in mailing_list_ids:
             logging.info("Fetching engagement scores for mailing list %s", list_id)
+            if ds.filename in self.writer_cache:
+                self.writer_cache[ds.filename].last_row_id = ""
 
-            def on_page(data: list[dict], _next_id: str) -> None:
-                nonlocal table, fieldnames
+            def on_page(data: list[dict], _next_id: str, list_id=list_id) -> None:
                 for row in data:
                     row["ID_USER_LIST"] = list_id
-                if table is None:
-                    fieldnames = self._get_fieldnames(data, ds.primary_key)
+                if ds.filename not in self.writer_cache:
                     table = self.create_out_table_definition(
                         ds.filename, incremental=True, primary_key=["ID_EMAIL", "ID_USER_LIST"]
                     )
+                    fieldnames = self._get_fieldnames(data, ds.primary_key)
                     with open(table.full_path, mode="w", encoding="utf-8", newline="") as f:
                         csv.DictWriter(f, fieldnames=fieldnames).writeheader()
+                    self.writer_cache[ds.filename] = WriterCacheEntry(table, fieldnames, "")
                     self.write_manifest(table)
-                with open(table.full_path, mode="a", encoding="utf-8", newline="") as f:
-                    writer = csv.DictWriter(f, fieldnames=fieldnames)
-                    for row in data:
-                        writer.writerow(row)
+                self._write_results(ds, data)
 
             self._paginate(
                 ds,
