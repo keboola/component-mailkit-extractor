@@ -133,14 +133,17 @@ class Component(ComponentBase):
         fieldnames.remove(primary_key)
         return [primary_key] + sorted(list(fieldnames))
 
-    def _write_results(self, ds: Dataset, data: list[dict] | None) -> None:
+    def _write_results(
+        self, ds: Dataset, data: list[dict] | None, primary_key: list[str] | None = None
+    ) -> None:
         if not data:
             logging.warning("No data in the %s dataset", ds.title)
             return
 
         if ds.filename not in self.writer_cache:
             logging.info("Writing %s items to %s", len(data), ds.filename)
-            table = self.create_out_table_definition(ds.filename, incremental=True, primary_key=[ds.primary_key])
+            pk = primary_key or [ds.primary_key]
+            table = self.create_out_table_definition(ds.filename, incremental=True, primary_key=pk)
             fieldnames = self._get_fieldnames(data, ds.primary_key)
 
             with open(table.full_path, mode="w", encoding="utf-8", newline="") as out_file:
@@ -289,16 +292,7 @@ class Component(ComponentBase):
             def on_page(data: list[dict], _next_id: str, list_id=list_id) -> None:
                 for row in data:
                     row["ID_USER_LIST"] = list_id
-                if ds.filename not in self.writer_cache:
-                    table = self.create_out_table_definition(
-                        ds.filename, incremental=True, primary_key=["ID_EMAIL", "ID_USER_LIST"]
-                    )
-                    fieldnames = self._get_fieldnames(data, ds.primary_key)
-                    with open(table.full_path, mode="w", encoding="utf-8", newline="") as f:
-                        csv.DictWriter(f, fieldnames=fieldnames).writeheader()
-                    self.writer_cache[ds.filename] = WriterCacheEntry(table, fieldnames, "")
-                    self.write_manifest(table)
-                self._write_results(ds, data)
+                self._write_results(ds, data, primary_key=["ID_EMAIL", "ID_USER_LIST"])
 
             self._paginate(
                 ds,

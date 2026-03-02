@@ -90,6 +90,10 @@ class DatasetsEnum(Enum):
     MSG_BOUNCES = Dataset("MSG_BOUNCES", "mailkit.report.message.bounces", depends_on=[str(REPORT_CAMPAIGN)])
 
 
+# Internal Dataset used by MailkitClient.mailinglist_list() to call _call_api() without a DatasetsEnum member.
+MAILINGLIST_LIST_DS = Dataset("_MAILING_LISTS", "mailkit.mailinglist.list", "mailing lists")
+
+
 class DateRangeEnum(str, Enum):
     RELATIVE = "relative"
     ABSOLUTE = "absolute"

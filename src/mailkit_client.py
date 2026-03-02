@@ -5,12 +5,10 @@ from typing import Any
 import requests
 from keboola.component.exceptions import UserException
 
-from configuration import Dataset
+from configuration import Dataset, MAILINGLIST_LIST_DS
 
 ENDPOINT = "https://api.mailkit.eu/json.fcgi"
 BATCH_SIZE = 5_000
-
-_MAILINGLIST_LIST_DS = Dataset("_MAILING_LISTS", "mailkit.mailinglist.list", "mailing lists")
 
 
 @dataclass
@@ -123,7 +121,7 @@ class MailkitClient:
 
     def mailinglist_list(self) -> list | None:
         # https://www.mailkit.com/resources/api/mailing-list-management/mailkitmailinglistlist
-        return self._call_api(_MAILINGLIST_LIST_DS, {})
+        return self._call_api(MAILINGLIST_LIST_DS, {})
 
     def mailinglist_engagement(
         self, ds: Dataset, id_user_list: str, id_email: str = "", limit: int = 25_000
