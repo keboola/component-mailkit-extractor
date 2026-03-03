@@ -1,5 +1,6 @@
 import csv
 import logging
+from collections.abc import Callable
 from dataclasses import dataclass
 
 from keboola.component import sync_actions
@@ -8,7 +9,7 @@ from keboola.component.dao import TableDefinition
 from keboola.component.exceptions import UserException
 
 from configuration import Configuration, Dataset, DatasetsEnum
-from mailkit_client import MailkitClient
+from mailkit_client import MailkitClient, PagingResult
 
 
 @dataclass
@@ -97,6 +98,9 @@ class Component(ComponentBase):
                     write_at_once = False
                 case DatasetsEnum.MLIST_UNSUBSCRIBED:
                     data = self._get_mailinglist_unsubscribed(ds, date_from)
+                case DatasetsEnum.ENGAGEMENT:
+                    self._get_engagement(ds)
+                    write_at_once = False
                 case _:
                     logging.warning(
                         "The %s dataset (API method: %s) is not implemented. If you believe this is an error, "
@@ -129,14 +133,17 @@ class Component(ComponentBase):
         fieldnames.remove(primary_key)
         return [primary_key] + sorted(list(fieldnames))
 
-    def _write_results(self, ds: Dataset, data: list[dict] | None) -> None:
+    def _write_results(
+        self, ds: Dataset, data: list[dict] | None, primary_key: list[str] | None = None
+    ) -> None:
         if not data:
             logging.warning("No data in the %s dataset", ds.title)
             return
 
         if ds.filename not in self.writer_cache:
             logging.info("Writing %s items to %s", len(data), ds.filename)
-            table = self.create_out_table_definition(ds.filename, incremental=True, primary_key=[ds.primary_key])
+            pk = primary_key or [ds.primary_key]
+            table = self.create_out_table_definition(ds.filename, incremental=True, primary_key=pk)
             fieldnames = self._get_fieldnames(data, ds.primary_key)
 
             with open(table.full_path, mode="w", encoding="utf-8", newline="") as out_file:
@@ -225,16 +232,19 @@ class Component(ComponentBase):
                 )
             self._get_raw_items_by_campaign(ds, campaign_id, initial_next_id)
 
-    def _get_raw_items_by_campaign(self, ds: Dataset, campaign_id: str = "", next_id: str = "") -> None:
+    def _paginate(
+        self,
+        ds: Dataset,
+        fetch_page: Callable[[str], PagingResult],
+        on_page: Callable[[list[dict], str], None],
+        initial_next_id: str = "",
+    ) -> None:
+        next_id = initial_next_id
         while True:
-            paging_response = self.mkc.raw_messages_bounces_responses(ds, campaign_id, next_id)
+            paging_response = fetch_page(next_id)
             if not (data := paging_response.items):
                 break
-            self._write_results(ds, data)
-            # Track the last seen ID for state file (per endpoint and campaign)
-            if ds.title not in self.last_seen_ids:
-                self.last_seen_ids[ds.title] = {}
-            self.last_seen_ids[ds.title][campaign_id] = paging_response.next_id
+            on_page(data, paging_response.next_id)
             paging_response.items.clear()
             if not paging_response.next_id or paging_response.next_id == next_id:
                 break
@@ -244,6 +254,51 @@ class Component(ComponentBase):
                 paging_response.next_id,
             )
             next_id = paging_response.next_id
+
+    def _get_raw_items_by_campaign(self, ds: Dataset, campaign_id: str = "", next_id: str = "") -> None:
+        def on_page(data: list[dict], page_next_id: str) -> None:
+            self._write_results(ds, data)
+            if ds.title not in self.last_seen_ids:
+                self.last_seen_ids[ds.title] = {}
+            self.last_seen_ids[ds.title][campaign_id] = page_next_id
+
+        self._paginate(
+            ds,
+            fetch_page=lambda nid: self.mkc.raw_messages_bounces_responses(ds, campaign_id, nid),
+            on_page=on_page,
+            initial_next_id=next_id,
+        )
+
+    def _get_engagement(self, ds: Dataset) -> None:
+        mailing_list_ids = self.params.mailing_list_ids
+        if not mailing_list_ids:
+            logging.info("No Mailing List IDs configured, fetching all mailing lists automatically.")
+            lists = self.mkc.mailinglist_list()
+            if not lists:
+                raise UserException(
+                    "Failed to fetch mailing lists from Mailkit. "
+                    "Please verify your credentials or specify Mailing List IDs manually."
+                )
+            mailing_list_ids = [ml["ID_USER_LIST"] for ml in lists if ml.get("STATUS") == "enabled"]
+            if not mailing_list_ids:
+                raise UserException("No enabled mailing lists found in your Mailkit account.")
+            logging.info("Auto-detected %s enabled mailing list(s): %s", len(mailing_list_ids), mailing_list_ids)
+
+        for list_id in mailing_list_ids:
+            logging.info("Fetching engagement scores for mailing list %s", list_id)
+            if ds.filename in self.writer_cache:
+                self.writer_cache[ds.filename].last_row_id = ""
+
+            def on_page(data: list[dict], _next_id: str, list_id=list_id) -> None:
+                for row in data:
+                    row["ID_USER_LIST"] = list_id
+                self._write_results(ds, data, primary_key=["ID_EMAIL", "ID_USER_LIST"])
+
+            self._paginate(
+                ds,
+                fetch_page=lambda nid, lid=list_id: self.mkc.mailinglist_engagement(ds, lid, id_email=nid),
+                on_page=on_page,
+            )
 
     def _get_mailinglist_unsubscribed(self, ds: Dataset, date_from: str) -> list[dict]:
         if data := self.mkc.mailinglist_unsubscribed(ds, date_from):

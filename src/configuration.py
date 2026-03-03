@@ -69,6 +69,14 @@ class DatasetsEnum(Enum):
     MLIST_UNSUBSCRIBED = Dataset(
         "MLIST_UNSUBSCRIBED", "mailkit.mailinglist.unsubscribed", "unsubscribed emails", "unsubscribed.csv", "EMAIL"
     )
+    ENGAGEMENT = Dataset(
+        "ENGAGEMENT",
+        "mailkit.mailinglist.engagement",
+        "engagement scores",
+        "engagement.csv",
+        "ID_EMAIL",
+        paging_key="ID_email",
+    )
 
     # The following enum values are not implemented in the current version as they were not used by the clients at all.
     # We keep them here just for backwards compatibility of the configurations.
@@ -80,6 +88,10 @@ class DatasetsEnum(Enum):
         "LINKS_VISITORS", "mailkit.report.message.links.visitors", depends_on=[str(REPORT_CAMPAIGN)]
     )  # this dataset has one more dependency (ID_URL)
     MSG_BOUNCES = Dataset("MSG_BOUNCES", "mailkit.report.message.bounces", depends_on=[str(REPORT_CAMPAIGN)])
+
+
+# Internal Dataset used by MailkitClient.mailinglist_list() to call _call_api() without a DatasetsEnum member.
+MAILINGLIST_LIST_DS = Dataset("_MAILING_LISTS", "mailkit.mailinglist.list", "mailing lists")
 
 
 class DateRangeEnum(str, Enum):
@@ -100,6 +112,7 @@ class Configuration(BaseModel):
     date_to: str | None = Field(alias="dateTo", default="")  # TODO: Pydantic validation
 
     campaign_ids: list[str] = Field(alias="campaignIds", default_factory=list)
+    mailing_list_ids: list[str] = Field(alias="mailingListIds", default_factory=list)
 
     @computed_field
     @cached_property
