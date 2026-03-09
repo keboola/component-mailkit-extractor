@@ -15,6 +15,7 @@ class Dataset:
     primary_key: str = ""
     paging_key: str = ""
     depends_on: list[str] = field(default_factory=list)
+    expected_fields: list[str] = field(default_factory=list)
 
     def __str__(self) -> str:
         return self.title
@@ -34,7 +35,33 @@ class DatasetsEnum(Enum):
     The order of the datasets here matters, as certain reports depend on previous ones.
     """
 
-    CAMPAIGNS = Dataset("CAMPAIGNS", "mailkit.campaigns.list", "list of campaigns", "campaigns.csv", "ID_MESSAGE")
+    CAMPAIGNS = Dataset(
+        "CAMPAIGNS",
+        "mailkit.campaigns.list",
+        "list of campaigns",
+        "campaigns.csv",
+        "ID_MESSAGE",
+        expected_fields=[
+            "ID_MESSAGE",
+            "NAME",
+            "SUBJECT",
+            "SUBJECT_B",
+            "MSG_TYPE",
+            "CAMPAIGN_TYPE",
+            "USE_AB",
+            "TEST_MODE",
+            "SEND_DATE",
+            "TIME_ZONE",
+            "LAST_SENT",
+            "REPEAT",
+            "REPEAT_COUNT",
+            "PERIOD",
+            "DAYS",
+            "STATUS",
+            "TYPE",
+            "USER_LIST",
+        ],
+    )
     REPORT = Dataset("REPORT", "mailkit.report", "summary report", "summaryreport.csv", "ID_MESSAGE")
     REPORT_CAMPAIGN = Dataset(
         "REPORT_CAMPAIGN",

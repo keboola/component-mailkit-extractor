@@ -122,8 +122,8 @@ class Component(ComponentBase):
             logging.info("State file saved: %s", self.last_seen_ids)
 
     @staticmethod
-    def _get_fieldnames(data: list[dict], primary_key: str) -> list[str]:
-        fieldnames = set()
+    def _get_fieldnames(data: list[dict], primary_key: str, expected_fields: list[str] | None = None) -> list[str]:
+        fieldnames = set(expected_fields or [])
         for row in data:
             if primary_key not in row:
                 raise Exception(
@@ -133,9 +133,7 @@ class Component(ComponentBase):
         fieldnames.remove(primary_key)
         return [primary_key] + sorted(list(fieldnames))
 
-    def _write_results(
-        self, ds: Dataset, data: list[dict] | None, primary_key: list[str] | None = None
-    ) -> None:
+    def _write_results(self, ds: Dataset, data: list[dict] | None, primary_key: list[str] | None = None) -> None:
         if not data:
             logging.warning("No data in the %s dataset", ds.title)
             return
@@ -144,10 +142,10 @@ class Component(ComponentBase):
             logging.info("Writing %s items to %s", len(data), ds.filename)
             pk = primary_key or [ds.primary_key]
             table = self.create_out_table_definition(ds.filename, incremental=True, primary_key=pk)
-            fieldnames = self._get_fieldnames(data, ds.primary_key)
+            fieldnames = self._get_fieldnames(data, ds.primary_key, ds.expected_fields or None)
 
             with open(table.full_path, mode="w", encoding="utf-8", newline="") as out_file:
-                cached_writer = csv.DictWriter(out_file, fieldnames=fieldnames)
+                cached_writer = csv.DictWriter(out_file, fieldnames=fieldnames, restval="")
                 cached_writer.writeheader()
                 self.writer_cache[ds.filename] = WriterCacheEntry(table, fieldnames, "")
 
@@ -159,7 +157,7 @@ class Component(ComponentBase):
         last_row_id = wc_entry.last_row_id
 
         with open(table.full_path, mode="a", encoding="utf-8", newline="") as out_file:
-            writer = csv.DictWriter(out_file, fieldnames=fieldnames)
+            writer = csv.DictWriter(out_file, fieldnames=fieldnames, restval="")
             for row in data:
                 if row[ds.primary_key] == last_row_id:
                     continue
