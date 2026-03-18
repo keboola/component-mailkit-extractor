@@ -2,11 +2,13 @@ import csv
 import logging
 from collections.abc import Callable
 from dataclasses import dataclass
+from pathlib import Path
 
 from keboola.component import sync_actions
 from keboola.component.base import ComponentBase, sync_action
 from keboola.component.dao import TableDefinition
 from keboola.component.exceptions import UserException
+from keboola.http_client import HttpClient
 
 from configuration import Configuration, Dataset, DatasetsEnum
 from mailkit_client import MailkitClient, PagingResult
@@ -25,6 +27,15 @@ class Component(ComponentBase):
 
         self.params = Configuration(**self.configuration.parameters)
         self.mkc = MailkitClient(self.params.client_id, self.params.client_md5)
+        self.storage_client = (
+            HttpClient(
+                self.environment_variables.url + "/v2/storage/",
+                auth_header={"X-StorageApi-Token": self.environment_variables.token},
+            )
+            if self.environment_variables.token and self.environment_variables.url
+            else None
+        )
+
         self.campaign_ids: list[str] = self.params.campaign_ids or []
         self.send_ids: set[str] = set()
 
@@ -121,9 +132,32 @@ class Component(ComponentBase):
             )
             logging.info("State file saved: %s", self.last_seen_ids)
 
+    def _get_existing_columns(self, filename: str) -> list[str]:
+        if not self.storage_client:
+            logging.info("Storage API not available, skipping existing columns check for %s", filename)
+            return []
+        component_id = self.environment_variables.component_id.replace(".", "-")
+        config_id = self.environment_variables.config_id
+        table_id = f"in.c-{component_id}-{config_id}.{Path(filename).stem}"
+        logging.info("Fetching existing columns for table: %s", table_id)
+        try:
+            response = self.storage_client.get_raw(f"tables/{table_id}")
+            if response.status_code == 404:
+                logging.info("Table %s does not exist yet", table_id)
+                return []
+            if not response.ok:
+                logging.warning("Failed to fetch columns for %s: HTTP %s", table_id, response.status_code)
+                return []
+            columns = response.json().get("columns", [])
+            logging.info("Found existing columns for %s: %s", table_id, columns)
+            return columns
+        except Exception as e:
+            logging.warning("Could not fetch existing columns for %s: %s", table_id, e)
+            return []
+
     @staticmethod
-    def _get_fieldnames(data: list[dict], primary_key: str) -> list[str]:
-        fieldnames = set()
+    def _get_fieldnames(data: list[dict], primary_key: str, expected_fields: list[str] | None = None) -> list[str]:
+        fieldnames = set(expected_fields or [])
         for row in data:
             if primary_key not in row:
                 raise Exception(
@@ -133,9 +167,7 @@ class Component(ComponentBase):
         fieldnames.remove(primary_key)
         return [primary_key] + sorted(list(fieldnames))
 
-    def _write_results(
-        self, ds: Dataset, data: list[dict] | None, primary_key: list[str] | None = None
-    ) -> None:
+    def _write_results(self, ds: Dataset, data: list[dict] | None, primary_key: list[str] | None = None) -> None:
         if not data:
             logging.warning("No data in the %s dataset", ds.title)
             return
@@ -144,10 +176,11 @@ class Component(ComponentBase):
             logging.info("Writing %s items to %s", len(data), ds.filename)
             pk = primary_key or [ds.primary_key]
             table = self.create_out_table_definition(ds.filename, incremental=True, primary_key=pk)
-            fieldnames = self._get_fieldnames(data, ds.primary_key)
+            existing_columns = self._get_existing_columns(ds.filename)
+            fieldnames = self._get_fieldnames(data, ds.primary_key, existing_columns)
 
             with open(table.full_path, mode="w", encoding="utf-8", newline="") as out_file:
-                cached_writer = csv.DictWriter(out_file, fieldnames=fieldnames)
+                cached_writer = csv.DictWriter(out_file, fieldnames=fieldnames, restval="")
                 cached_writer.writeheader()
                 self.writer_cache[ds.filename] = WriterCacheEntry(table, fieldnames, "")
 
@@ -159,7 +192,7 @@ class Component(ComponentBase):
         last_row_id = wc_entry.last_row_id
 
         with open(table.full_path, mode="a", encoding="utf-8", newline="") as out_file:
-            writer = csv.DictWriter(out_file, fieldnames=fieldnames)
+            writer = csv.DictWriter(out_file, fieldnames=fieldnames, restval="")
             for row in data:
                 if row[ds.primary_key] == last_row_id:
                     continue

@@ -5,7 +5,7 @@ from typing import Any
 import requests
 from keboola.component.exceptions import UserException
 
-from configuration import Dataset, MAILINGLIST_LIST_DS
+from configuration import MAILINGLIST_LIST_DS, Dataset
 
 ENDPOINT = "https://api.mailkit.eu/json.fcgi"
 BATCH_SIZE = 5_000
