@@ -77,7 +77,7 @@
     "daysPeriod": {
       "title": "Relative – Days Before Today",
       "type": "integer",
-      "description": "Sets the range period as number of days from now. When set to 0, all data is fetched",
+      "description": "Sets the range period as number of days from now. When set to 0, all data is fetched. <strong>Mailkit API limitation:</strong> CAMPAIGNS, ENGAGEMENT and RAW_* datasets do not support date filtering and will always return all available data. MLIST_UNSUBSCRIBED only supports a start date (end date is always today).",
       "propertyOrder": 60,
       "default": 7,
       "options": {
@@ -92,7 +92,7 @@
     "dateFrom": {
       "title": "Absolute – Date From",
       "type": "string",
-      "description": "Sets range period of returned data. Start date in format YYYY-MM-DD",
+      "description": "Sets range period start date in format YYYY-MM-DD. <strong>Mailkit API limitation:</strong> CAMPAIGNS, ENGAGEMENT and RAW_* datasets do not support date filtering and will always return all available data. MLIST_UNSUBSCRIBED uses this as the start date only (end date is always today).",
       "propertyOrder": 70,
       "default": null,
       "options": {
@@ -107,7 +107,7 @@
     "dateTo": {
       "title": "Absolute – Date To",
       "type": "string",
-      "description": "Sets range period of returned data. End date in format YYYY-MM-DD",
+      "description": "Sets range period end date in format YYYY-MM-DD. <strong>Mailkit API limitation:</strong> CAMPAIGNS, ENGAGEMENT and RAW_* datasets do not support date filtering and will always return all available data. MLIST_UNSUBSCRIBED ignores this field — its end date is always the time of extraction.",
       "propertyOrder": 80,
       "default": null,
       "options": {
