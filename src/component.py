@@ -271,6 +271,7 @@ class Component(ComponentBase):
         fetch_page: Callable[[str], PagingResult],
         on_page: Callable[[list[dict], str], None],
         initial_next_id: str = "",
+        min_page_size: int = 0,
     ) -> None:
         next_id = initial_next_id
         while True:
@@ -278,6 +279,10 @@ class Component(ComponentBase):
             if not (data := paging_response.items):
                 break
             on_page(data, paging_response.next_id)
+            if min_page_size and len(data) < min_page_size:
+                logging.info("Page size %i below threshold %i, stopping %s", len(data), min_page_size, ds.title)
+                paging_response.items.clear()
+                break
             paging_response.items.clear()
             if not paging_response.next_id or paging_response.next_id == next_id:
                 break
@@ -300,6 +305,7 @@ class Component(ComponentBase):
             fetch_page=lambda nid: self.mkc.raw_messages_bounces_responses(ds, campaign_id, nid),
             on_page=on_page,
             initial_next_id=next_id,
+            min_page_size=self.params.min_page_size,
         )
 
     def _get_engagement(self, ds: Dataset) -> None:

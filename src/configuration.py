@@ -113,6 +113,7 @@ class Configuration(BaseModel):
 
     campaign_ids: list[str] = Field(alias="campaignIds", default_factory=list)
     mailing_list_ids: list[str] = Field(alias="mailingListIds", default_factory=list)
+    min_page_size: int = Field(alias="minPageSize", default=200)
 
     @computed_field
     @cached_property

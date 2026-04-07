@@ -142,6 +142,13 @@
       "options": {
         "tooltip": "Optional for the ENGAGEMENT dataset. If left empty, all enabled mailing lists are fetched automatically."
       }
+    },
+    "minPageSize": {
+      "title": "Minimum Page Size",
+      "type": "integer",
+      "propertyOrder": 110,
+      "default": 200,
+      "description": "Stops paginating RAW_* datasets when a page returns fewer items than this threshold. This prevents the job from running indefinitely when new data is continuously added on the API side. Set to 0 to always paginate until the end."
     }
   }
 }
