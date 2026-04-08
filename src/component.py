@@ -281,11 +281,11 @@ class Component(ComponentBase):
             on_page(data, paging_response.next_id)
             if min_page_size and len(data) < min_page_size:
                 logging.info(
-                    "Page size %i below threshold %i, stopping %s (%s)",
-                    len(data),
-                    min_page_size,
+                    "Stopping %s: received page of %i %s, below minimum page size of %i",
                     ds.title,
+                    len(data),
                     ds.description,
+                    min_page_size,
                 )
                 paging_response.items.clear()
                 break
