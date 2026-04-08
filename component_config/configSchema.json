@@ -148,7 +148,10 @@
       "type": "integer",
       "propertyOrder": 110,
       "default": 200,
-      "description": "Stops paginating RAW_* datasets when a page returns fewer items than this threshold. This prevents the job from running indefinitely when new data is continuously added on the API side. Set to 0 to always paginate until the end."
+      "description": "Stops paginating RAW_* datasets when a page returns fewer items than this threshold. Set to 0 to always paginate until the end.",
+      "options": {
+        "tooltip": "Warning: On frequently updated datasets, the job may run indefinitely and eventually crash, causing both credit usage and data loss. Use the default value unless you understand the risks."
+      }
     }
   }
 }
