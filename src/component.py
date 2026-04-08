@@ -270,6 +270,7 @@ class Component(ComponentBase):
         ds: Dataset,
         fetch_page: Callable[[str], PagingResult],
         on_page: Callable[[list[dict], str], None],
+        min_page_size: int,
         initial_next_id: str = "",
     ) -> None:
         next_id = initial_next_id
@@ -278,6 +279,16 @@ class Component(ComponentBase):
             if not (data := paging_response.items):
                 break
             on_page(data, paging_response.next_id)
+            if min_page_size and len(data) < min_page_size:
+                logging.info(
+                    "Page size of %i %s is below threshold %i, stopping %s...",
+                    len(data),
+                    ds.description,
+                    min_page_size,
+                    ds.title,
+                )
+                paging_response.items.clear()
+                break
             paging_response.items.clear()
             if not paging_response.next_id or paging_response.next_id == next_id:
                 break
@@ -299,6 +310,7 @@ class Component(ComponentBase):
             ds,
             fetch_page=lambda nid: self.mkc.raw_messages_bounces_responses(ds, campaign_id, nid),
             on_page=on_page,
+            min_page_size=self.params.min_page_size,
             initial_next_id=next_id,
         )
 
@@ -331,6 +343,7 @@ class Component(ComponentBase):
                 ds,
                 fetch_page=lambda nid, lid=list_id: self.mkc.mailinglist_engagement(ds, lid, id_email=nid),
                 on_page=on_page,
+                min_page_size=self.params.min_page_size,
             )
 
     def _get_mailinglist_unsubscribed(self, ds: Dataset, date_from: str) -> list[dict]:
